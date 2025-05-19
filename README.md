@@ -17,7 +17,7 @@ AI Code Master 是一款集成了 AI 功能的 IntelliJ IDEA 插件，旨在帮�
 1. 打开 IntelliJ IDEA
 2. 进入 `File > Settings > Plugins` (Windows/Linux) 或 `IntelliJ IDEA > Preferences > Plugins` (Mac)
 3. 点击 `Marketplace` 选项卡
-4. 搜索 "AI Commit"
+4. 搜索 "AI Code Master"
 5. 点击 `Install` 安装插件
 6. 安装完成后点击 `Restart IDE` 重启 IDE
 
@@ -105,3 +105,4 @@ feat(auth): 实现完整的用户认证模块
 
 本项目是在以下开源项目上进行的改造，在此表示感谢：
 - (https://github.com/HMYDK/AIGitCommit.git)
+
