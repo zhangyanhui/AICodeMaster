@@ -6,8 +6,36 @@
 
     <vendor email="yohannzhang@qq.com">yohannzhang</vendor>
 
+    <description>
+        <![CDATA[
+<h3>AI Code Master is an IntelliJ IDEA plugin powered by AI to help developers streamline their workflow with intelligent features:</h3>
 
+<ul>
+    <li><strong>AI Commit Message Generation</strong>: Automatically generate concise and meaningful Git commit messages based on code changes.</li>
+    <li><strong>Code Analysis & Comment Generation</strong>: Analyze selected code and generate accurate comments in English or Chinese.</li>
+    <li><strong>Text-to-Code Generation</strong>: Write complete code snippets from natural language descriptions.</li>
+    <li><strong>Code Optimization Suggestions</strong>: Get smart suggestions for improving code performance, readability, and best practices.</li>
+    <li><strong>Smart Q&A Assistant</strong>: Ask coding-related questions and receive intelligent, context-aware answers.</li>
+</ul>
 
+<h3>Supported AI Models:</h3>
+<ul>
+    <li>OpenAI API (GPT-4, GPT-3.5)</li>
+    <li>Google Gemini</li>
+    <li>DeepSeek</li>
+    <li>Ollama (Local LLMs)</li>
+    <li>Cloudflare Workers AI</li>
+    <li>Alibaba Cloud Model Hub</li>
+    <li>SiliconFlow Model Hub</li>
+</ul>
+
+<h3>Usage:</h3>
+<ul>
+    <li>Select code and use the right-click menu or keyboard shortcuts (Alt + U / Alt + G / Alt + O / Alt + A) to trigger AI actions.</li>
+    <li>Configure your API keys and model settings under Settings > Tools > AI Code Master.</li>
+</ul>
+]]>
+    </description>
     <!-- Product and plugin compatibility requirements.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
     <depends>com.intellij.modules.lang</depends>
