@@ -1,6 +1,7 @@
 package com.yohannzhang.aigit.action;
 
 import com.intellij.openapi.fileTypes.StdFileTypes;
+import com.yohannzhang.aigit.ui.AIGuiComponent;
 import com.yohannzhang.aigit.ui.CombinedWindowFactory;
 import com.yohannzhang.aigit.constant.Constants;
 import com.yohannzhang.aigit.service.CodeService;
@@ -81,7 +82,7 @@ public class AskAnythingAction extends AnAction {
 //                CombinedWindowFactory combinedWindowFactory = project.getComponent(CombinedWindowFactory.class);
                 ApplicationManager.getApplication().invokeLater(() -> {
                     messageBuilder.append(token);
-                    CombinedWindowFactory.updateResult(messageBuilder.toString());
+                    updateToolWindowResult(project,messageBuilder.toString());
                 });
             }
 
@@ -92,7 +93,12 @@ public class AskAnythingAction extends AnAction {
             }
         });
     }
-
+    private void updateToolWindowResult(Project project, String result) {
+        CombinedWindowFactory factory = AIGuiComponent.getInstance(project).getWindowFactory();
+        if (factory != null) {
+            factory.updateResult(result);
+        }
+    }
     private void showWarningDialog(String message) {
         Messages.showMessageDialog(message, "Warning", Messages.getWarningIcon());
     }

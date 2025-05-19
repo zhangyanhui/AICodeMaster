@@ -41,7 +41,11 @@
     <depends>com.intellij.modules.lang</depends>
     <depends>com.intellij.modules.vcs</depends>
     <depends>Git4Idea</depends>
-
+    <project-components>
+        <component>
+            <implementation-class>com.yohannzhang.aigit.ui.AIGuiComponent</implementation-class>
+        </component>
+    </project-components>
     <!-- Extension points defined by the plugin.
      Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
     <extensions defaultExtensionNs="com.intellij">

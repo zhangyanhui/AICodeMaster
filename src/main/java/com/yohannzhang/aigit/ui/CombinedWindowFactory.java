@@ -38,7 +38,8 @@ public class CombinedWindowFactory implements ToolWindowFactory {
     private final StringBuilder messageBuilder = new StringBuilder();
     private static final String COPY_ICON_PATH = "/icons/copy.png";
     private static final StringBuilder buffer = new StringBuilder();
-    private static JEditorPane htmlViewer;
+    private transient JEditorPane htmlViewer; // 改为实例变量
+
     private static EditorColorsScheme getCurrentColorScheme() {
         return EditorColorsManager.getInstance().getGlobalScheme();
     }
@@ -56,6 +57,7 @@ public class CombinedWindowFactory implements ToolWindowFactory {
 
         Content content = ContentFactory.getInstance().createContent(panel, "", false);
         toolWindow.getContentManager().addContent(content);
+        AIGuiComponent.getInstance(project).setWindowFactory(this);
     }
 
     private GridBagConstraints createDefaultConstraints() {
@@ -191,6 +193,7 @@ public class CombinedWindowFactory implements ToolWindowFactory {
     private void showError(Project project, String message) {
         IdeaDialogUtil.showError(project, message, "Error");
     }
+
     public static String renderMarkdownToHtmlWithHighlighting(String markdown) {
         MutableDataSet options = new MutableDataSet();
         options.set(Parser.EXTENSIONS, Arrays.asList(
@@ -204,7 +207,7 @@ public class CombinedWindowFactory implements ToolWindowFactory {
         return renderer.render(parser.parse(markdown));
     }
 
-    public static synchronized void updateResult(String markdownResult) {
+    public synchronized void updateResult(String markdownResult) {
 //        buffer.append(markdownResult);
         ApplicationManager.getApplication().invokeLater(() -> {
             if (htmlViewer == null) return;
@@ -277,52 +280,52 @@ public class CombinedWindowFactory implements ToolWindowFactory {
             Color builtInColor = new Color(43, 145, 175); // 蓝绿色
 
             String htmlWithStyles = """
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <style>
-        body {
-            color: %s;
-            background-color: %s;
-            font-family: sans-serif;
-        }
-        pre {
-            border: 1px solid #ccc;
-            padding: 10px;
-            background-color: %s;
-            overflow-x: auto;
-        }
-        code {
-            font-family: monospace;
-            color: %s;
-        }
-        .hl-keyword { color: %s; }
-        .hl-string   { color: %s; }
-        .hl-comment  { color: %s; }
-        .hl-number   { color: %s; }
-        .hl-tag      { color: %s; }
-        .hl-attr     { color: %s; }
-        .hl-built_in { color: %s; }
-
-        .copy-button {
-            position: absolute;
-            top: 5px;
-            right: 5px;
-            background-color: transparent;
-            border: none;
-            padding: 0;
-            cursor: pointer;
-        }
-        .copy-button img {
-            width: 16px;
-            height: 16px;
-        }
-    </style>
-</head>
-<body>%s</body>
-</html>
-""".formatted(
+                    <!DOCTYPE html>
+                    <html lang="zh-CN">
+                    <head>
+                        <meta charset="UTF-8">
+                        <style>
+                            body {
+                                color: %s;
+                                background-color: %s;
+                                font-family: sans-serif;
+                            }
+                            pre {
+                                border: 1px solid #ccc;
+                                padding: 10px;
+                                background-color: %s;
+                                overflow-x: auto;
+                            }
+                            code {
+                                font-family: monospace;
+                                color: %s;
+                            }
+                            .hl-keyword { color: %s; }
+                            .hl-string   { color: %s; }
+                            .hl-comment  { color: %s; }
+                            .hl-number   { color: %s; }
+                            .hl-tag      { color: %s; }
+                            .hl-attr     { color: %s; }
+                            .hl-built_in { color: %s; }
+                    
+                            .copy-button {
+                                position: absolute;
+                                top: 5px;
+                                right: 5px;
+                                background-color: transparent;
+                                border: none;
+                                padding: 0;
+                                cursor: pointer;
+                            }
+                            .copy-button img {
+                                width: 16px;
+                                height: 16px;
+                            }
+                        </style>
+                    </head>
+                    <body>%s</body>
+                    </html>
+                    """.formatted(
                     toHexString(foreground),
                     toHexString(background),
                     toHexString(background.brighter()), // 示例：浅一点的背景用于代码块
@@ -336,9 +339,6 @@ public class CombinedWindowFactory implements ToolWindowFactory {
                     toHexString(builtInColor),
                     html
             );
-
-
-
 
 
             // 滚动到底部
@@ -358,6 +358,7 @@ public class CombinedWindowFactory implements ToolWindowFactory {
 //            buffer.setLength(0); // 清空缓冲区
         });
     }
+
     private static String toHexString(Color color) {
         return String.format("#%02x%02x%02x", color.getRed(), color.getGreen(), color.getBlue());
     }

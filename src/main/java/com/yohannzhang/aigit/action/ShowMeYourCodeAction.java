@@ -2,6 +2,7 @@ package com.yohannzhang.aigit.action;
 
 
 import com.intellij.openapi.fileTypes.StdFileTypes;
+import com.yohannzhang.aigit.ui.AIGuiComponent;
 import com.yohannzhang.aigit.ui.CombinedWindowFactory;
 import com.yohannzhang.aigit.constant.Constants;
 import com.yohannzhang.aigit.service.CodeService;
@@ -72,10 +73,10 @@ public class ShowMeYourCodeAction extends AnAction {
                                         token -> ApplicationManager.getApplication().invokeLater(() -> {
                                             if (messageBuilder.isEmpty()) {
                                                 messageBuilder.append(token);
-                                                CombinedWindowFactory.updateResult(messageBuilder.toString());
+                                                updateToolWindowResult(project,messageBuilder.toString());
                                             } else {
                                                 messageBuilder.append(token);
-                                                CombinedWindowFactory.updateResult(messageBuilder.toString());
+                                                updateToolWindowResult(project,messageBuilder.toString());
                                             }
                                         }),
                                         // onError 处理错误
@@ -100,4 +101,11 @@ public class ShowMeYourCodeAction extends AnAction {
             }
         }
     }
+    private void updateToolWindowResult(Project project, String result) {
+        CombinedWindowFactory factory = AIGuiComponent.getInstance(project).getWindowFactory();
+        if (factory != null) {
+            factory.updateResult(result);
+        }
+    }
+
 }
