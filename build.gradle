@@ -1,0 +1,42 @@
+plugins {
+    id("java")
+    id("org.jetbrains.intellij") version "1.17.3"
+}
+
+group = "com.yohannzhang"
+version = "1.5.0"
+
+repositories {
+    mavenCentral()
+    google()
+    maven { url 'https://maven.aliyun.com/repository/public/' }
+}
+
+intellij {
+    version.set("2022.2")
+    type.set("IU") // 使用 IntelliJ IDEA Ultimate
+    plugins = ["Git4Idea"]
+}
+
+patchPluginXml.sinceBuild.set("222.4167.29")
+patchPluginXml.untilBuild.set("243.*")
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    sourceCompatibility = '17'
+    targetCompatibility = '17'
+    buildSearchableOptions.enabled = false
+}
+
+dependencies {
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.17.1'
+
+    implementation 'com.vladsch.flexmark:flexmark-all:0.64.0'
+}
+
+
+runIde {
+    intellij {
+        autoReloadPlugins = true
+    }
+}

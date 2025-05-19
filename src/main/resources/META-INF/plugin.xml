@@ -1,0 +1,78 @@
+<!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
+<idea-plugin>
+    <id>com.yohannzhang.aigit</id>
+
+    <name>AI Code Master</name>
+
+    <vendor email="yohannzhang@qq.com">yohannzhang</vendor>
+
+
+
+    <!-- Product and plugin compatibility requirements.
+         Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
+    <depends>com.intellij.modules.lang</depends>
+    <depends>com.intellij.modules.vcs</depends>
+    <depends>Git4Idea</depends>
+
+    <!-- Extension points defined by the plugin.
+     Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- 注册欢迎通知活动 -->
+        <postStartupActivity implementation="com.yohannzhang.aigit.action.WelcomeNotification"/>
+        <!-- 声明通知组 -->
+        <notificationGroup id="AI Git Commit Notifications" displayType="BALLOON"/>
+        <!--        <applicationConfigurable instance="config.com.yohannzhang.aigit.ApiKeyConfigurable"-->
+        <!--            displayName="AI Git Commit"/>-->
+        <applicationConfigurable instance="com.yohannzhang.aigit.config.ApiKeyConfigurable"
+                                 id="aigit.settings"
+                                 displayName="AI Code Master"
+                                 groupId="Tools"/>
+        <applicationService serviceImplementation="com.yohannzhang.aigit.config.ApiKeySettings"/>
+
+
+        <!-- 注册工具窗口 -->
+        <toolWindow id="AICodeMaster" icon="/icons/git-commit-logo.svg"
+                    anchor="right"
+                    factoryClass="com.yohannzhang.aigit.ui.CombinedWindowFactory"/>
+    </extensions>
+
+    <actions>
+        <!-- Declare the action for manual commit message generation -->
+        <action id="AICommitMessage.Generate"
+                class="com.yohannzhang.aigit.action.GenerateCommitMessageAction"
+                text="Generate AI Commit Message"
+                icon="/icons/git-commit-logo.svg"
+                description="Generate a commit message using AI">
+            <add-to-group group-id="Vcs.MessageActionGroup" anchor="first"/>
+        </action>
+        <action id="com.yohannzhang.aigit.action.AddCommentAction" class="com.yohannzhang.aigit.action.AddCommentAction" text="补充代码注释" description="对选中的代码生成对应的注释">
+            <add-to-group group-id="EditorPopupMenu" anchor="first" />
+            <keyboard-shortcut keymap="$default" first-keystroke="alt U" />
+        </action>
+        <action id="ShowMeYourCodeAction" class="com.yohannzhang.aigit.action.ShowMeYourCodeAction" text="文字生成代码" description="根据文字生成代码">
+            <add-to-group group-id="EditorPopupMenu" anchor="first" />
+            <keyboard-shortcut keymap="$default" first-keystroke="alt G" />
+        </action>
+        <action id="OptimizeCodeAction" class="com.yohannzhang.aigit.action.OptimizeCodeAction" text="优化代码" description="根据给出的代码给出相应的优化建议">
+            <add-to-group group-id="EditorPopupMenu" anchor="first" />
+            <keyboard-shortcut keymap="$default" first-keystroke="alt O" />
+        </action>
+        <action id="AskAnythingAction" class="com.yohannzhang.aigit.action.AskAnythingAction" text="问一些问题" description="根据问题作出回答">
+            <add-to-group group-id="EditorPopupMenu" anchor="first" />
+            <keyboard-shortcut keymap="$default" first-keystroke="alt A" />
+        </action>
+    </actions>
+
+
+    <change-notes>
+        <![CDATA[
+        <h3>Added:</h3>
+        <ul>
+            <li>Fix the issue of encoding error.</li>
+            <li>Support for DeepSeek-v3.</li>
+        </ul>
+        ]]>
+    </change-notes>
+
+
+</idea-plugin>
