@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "com.yohannzhang"
-version = "1.5.0"
+version = "1.5.3"
 
 repositories {
     mavenCentral()
@@ -29,20 +29,13 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 dependencies {
-
-    implementation 'com.vladsch.flexmark:flexmark-all:0.64.8'
-
-}
-
-
-jar {
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-    manifest {
-        attributes(
-                'Implementation-Title': project.name,
-                'Implementation-Version': project.version
-        )
-    }
+//    implementation 'com.fasterxml.jackson.core:jackson-databind:2.17.1'
+//    implementation 'com.vladsch.flexmark:flexmark-all:0.64.0'
+    implementation 'com.vladsch.flexmark:flexmark:0.64.8'
+//    implementation 'com.vladsch.flexmark:flexmark-ext-tables:0.64.0' // 请根据实际情况选择合适的版本
+    implementation 'com.fifesoft:rsyntaxtextarea:3.1.3'
+    implementation 'org.openjfx:javafx-controls:17'
+//    implementation 'org.openjfx:javafx-web:17'
 }
 
 

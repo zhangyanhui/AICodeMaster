@@ -73,10 +73,10 @@ public class ShowMeYourCodeAction extends AnAction {
                                         token -> ApplicationManager.getApplication().invokeLater(() -> {
                                             if (messageBuilder.isEmpty()) {
                                                 messageBuilder.append(token);
-                                                updateToolWindowResult(project,messageBuilder.toString());
+                                                AIGuiComponent.getInstance(project).getWindowFactory().updateResult(messageBuilder.toString());
                                             } else {
                                                 messageBuilder.append(token);
-                                                updateToolWindowResult(project,messageBuilder.toString());
+                                                AIGuiComponent.getInstance(project).getWindowFactory().updateResult(messageBuilder.toString());
                                             }
                                         }),
                                         // onError 处理错误
@@ -101,11 +101,4 @@ public class ShowMeYourCodeAction extends AnAction {
             }
         }
     }
-    private void updateToolWindowResult(Project project, String result) {
-        CombinedWindowFactory factory = AIGuiComponent.getInstance(project).getWindowFactory();
-        if (factory != null) {
-            factory.updateResult(result);
-        }
-    }
-
 }

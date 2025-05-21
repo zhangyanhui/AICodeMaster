@@ -37,11 +37,11 @@ public class ApiKeyConfigurable implements Configurable {
 
     @Override
     public boolean isModified() {
-//        return !settings.getSelectedClient().equals(ui.getClientComboBox().getSelectedItem())
-//                || !settings.getSelectedModule().equals(ui.getModuleComboBox().getSelectedItem())
-//                || !settings.getCommitLanguage().equals(ui.getLanguageComboBox().getSelectedItem())
-//                || isCustomPromptsModified() || isCustomPromptModified() || isPromptTypeModified();
-        return true;
+        return !settings.getSelectedClient().equals(ui.getClientComboBox().getSelectedItem())
+                || !settings.getSelectedModule().equals(ui.getModuleComboBox().getSelectedItem())
+                || !settings.getCommitLanguage().equals(ui.getLanguageComboBox().getSelectedItem())
+                || isCustomPromptsModified() || isCustomPromptModified() || isPromptTypeModified();
+//        return true;
     }
 
     @Override

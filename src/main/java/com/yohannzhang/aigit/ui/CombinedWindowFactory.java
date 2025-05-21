@@ -13,8 +13,7 @@ import com.intellij.openapi.wm.ToolWindowFactory;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.content.Content;
 import com.intellij.ui.content.ContentFactory;
-import com.vladsch.flexmark.ext.footnotes.FootnoteExtension;
-import com.vladsch.flexmark.ext.tables.TablesExtension;
+import com.intellij.ui.jcef.JBCefBrowser;
 import com.vladsch.flexmark.html.HtmlRenderer;
 import com.vladsch.flexmark.parser.Parser;
 import com.vladsch.flexmark.util.data.MutableDataSet;
@@ -25,39 +24,106 @@ import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
 import java.awt.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.URL;
-import java.util.Arrays;
 
 public class CombinedWindowFactory implements ToolWindowFactory {
     private static final CodeUtil CODE_UTIL = new CodeUtil();
-
     private static final Font BUTTON_FONT = new Font("SansSerif", Font.BOLD, 14);
     private static final Color BUTTON_COLOR = new Color(0, 120, 215);
     private static final Color BUTTON_HOVER_COLOR = new Color(0, 100, 200);
 
     private JTextArea questionTextArea;
     private final StringBuilder messageBuilder = new StringBuilder();
-    private transient JEditorPane htmlViewer; // 改为实例变量
+    private  JBCefBrowser markdownViewer; // 使用 JBCefBrowser 替换 JEditorPane
+    private  Color ideBackgroundColor; // 缓存 IDE 背景色
 
-    private static EditorColorsScheme getCurrentColorScheme() {
-        return EditorColorsManager.getInstance().getGlobalScheme();
+    // 初始化 Flexmark 配置（仅执行一次）
+    private static final Parser parser;
+    private static final HtmlRenderer renderer;
+
+
+
+
+    static {
+        MutableDataSet options = new MutableDataSet();
+        parser = Parser.builder(options).build();
+        renderer = HtmlRenderer.builder(options).build();
+    }
+    /**
+     * 读取 classpath 中的资源文件并返回字符串
+     */
+    private static String readResourceFile(String filename) {
+        StringBuilder content = new StringBuilder();
+        try (InputStream is = CombinedWindowFactory.class.getClassLoader().getResourceAsStream(filename);
+             BufferedReader reader = new BufferedReader(new InputStreamReader(is))) {
+
+            if (is == null) {
+                throw new RuntimeException("Resource not found: " + filename);
+            }
+
+            String line;
+            while ((line = reader.readLine()) != null) {
+                content.append(line).append("\n");
+            }
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to read resource file: " + filename, e);
+        }
+        return content.toString();
     }
 
     @Override
     public void createToolWindowContent(@NotNull Project project, @NotNull ToolWindow toolWindow) {
+        // 初始化 IDE 背景色
+        initIdeBackgroundColor();
+
         JPanel panel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = createDefaultConstraints();
 
         panel.add(createOutputPanel(project), gbc);
-
         gbc.gridy = 1;
         gbc.weighty = 0.3;
         panel.add(createInputPanel(project), gbc);
 
         Content content = ContentFactory.getInstance().createContent(panel, "", false);
         toolWindow.getContentManager().addContent(content);
-        AIGuiComponent.getInstance(project).setWindowFactory(this);
     }
+
+    private void initIdeBackgroundColor() {
+        EditorColorsScheme colorsScheme = EditorColorsManager.getInstance().getGlobalScheme();
+        ideBackgroundColor = colorsScheme.getDefaultBackground();
+        Color ideFontColor = colorsScheme.getDefaultForeground();
+        colorsScheme.getFontPreferences();
+    }
+
+    public void updateResult(String markdownResult) {
+        if (markdownViewer == null) return;
+
+        // 解析 Markdown 到 HTML
+        com.vladsch.flexmark.util.ast.Document document = parser.parse(markdownResult);
+        String htmlBody = renderer.render(document);
+
+        // 转义反引号防止 JS 注入问题
+        String safeHtml = htmlBody.replace("`", "\\`");
+
+        // 使用 JS 更新内容并触发高亮和滚动
+        String script = String.format(
+                "document.getElementById('content').innerHTML = `%s`; hljs.highlightAll(); addCopyButtons(); window.scrollTo(0, document.body.scrollHeight);",
+                safeHtml
+        );
+
+        ApplicationManager.getApplication().invokeLater(() -> {
+            markdownViewer.getCefBrowser().executeJavaScript(script, "about:blank", 0);
+        });
+    }
+
+
+
+
+
 
     private GridBagConstraints createDefaultConstraints() {
         GridBagConstraints gbc = new GridBagConstraints();
@@ -71,22 +137,19 @@ public class CombinedWindowFactory implements ToolWindowFactory {
     }
 
     private JPanel createOutputPanel(Project project) {
-        JPanel outputPanel = new JPanel(new BorderLayout());
-        outputPanel.setDoubleBuffered(true);
+        JPanel outputPanel = new JPanel(new BorderLayout(10, 10));
         outputPanel.setBorder(BorderFactory.createTitledBorder("输出结果"));
+        outputPanel.setBackground(ideBackgroundColor);
 
-        EditorColorsScheme colorsScheme = EditorColorsManager.getInstance().getGlobalScheme();
-        Color backgroundColor = colorsScheme.getDefaultBackground();
-        outputPanel.setBackground(backgroundColor);
+        markdownViewer = new JBCefBrowser();
+        markdownViewer.getComponent().setBorder(BorderFactory.createEmptyBorder());
+        String EMPTY_HTML = readResourceFile("empty.html");
+        // 初始加载空 HTML 页面
+        ApplicationManager.getApplication().invokeLater(() -> {
+            markdownViewer.loadHTML(EMPTY_HTML);
+        });
 
-        htmlViewer = new JEditorPane();
-        htmlViewer.setContentType("text/html");
-        htmlViewer.setEditable(false);
-        htmlViewer.setBackground(backgroundColor);
-        htmlViewer.putClientProperty(JEditorPane.HONOR_DISPLAY_PROPERTIES, Boolean.TRUE); // 启用 JS
-
-        JScrollPane scrollPane = new JBScrollPane(htmlViewer);
-        outputPanel.add(scrollPane, BorderLayout.CENTER);
+        outputPanel.add(markdownViewer.getComponent(), BorderLayout.CENTER);
 
         return outputPanel;
     }
@@ -95,19 +158,17 @@ public class CombinedWindowFactory implements ToolWindowFactory {
     private JPanel createInputPanel(Project project) {
         JPanel inputPanel = new JPanel(new BorderLayout(10, 10));
         inputPanel.setBorder(BorderFactory.createTitledBorder("输入问题"));
-
-        EditorColorsScheme colorsScheme = EditorColorsManager.getInstance().getGlobalScheme();
-        Color backgroundColor = colorsScheme.getDefaultBackground();
-        inputPanel.setBackground(backgroundColor);
+        inputPanel.setBackground(ideBackgroundColor);
 
         questionTextArea = new JTextArea(5, 50);
-        questionTextArea.setEditable(true);
         questionTextArea.setLineWrap(true);
         questionTextArea.setWrapStyleWord(true);
-        questionTextArea.setBackground(backgroundColor);
+        questionTextArea.setBackground(ideBackgroundColor); // 输入框背景与 IDE 一致
+        questionTextArea.setForeground(Color.WHITE); // 文本颜色可根据需要调整
 
         inputPanel.add(new JBScrollPane(questionTextArea), BorderLayout.CENTER);
         inputPanel.add(createButtonPanel(project), BorderLayout.SOUTH);
+        AIGuiComponent.getInstance(project).setWindowFactory(this);
 
         return inputPanel;
     }
@@ -117,6 +178,7 @@ public class CombinedWindowFactory implements ToolWindowFactory {
         askButton.addActionListener(event -> handleAskButtonClick(project));
 
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        buttonPanel.setBackground(ideBackgroundColor); // 按钮面板背景与 IDE 一致
         buttonPanel.add(askButton);
         return buttonPanel;
     }
@@ -125,18 +187,20 @@ public class CombinedWindowFactory implements ToolWindowFactory {
         JButton button = new JButton(text);
         button.setFont(BUTTON_FONT);
         button.setBorderPainted(false);
-        button.setContentAreaFilled(false);
-        button.setFocusPainted(false);
         button.setOpaque(true);
         button.setBackground(BUTTON_COLOR);
         button.setForeground(Color.WHITE);
+        button.setFocusPainted(false);
 
+        // 鼠标悬停效果
         button.addMouseListener(new java.awt.event.MouseAdapter() {
-            public void mouseEntered(java.awt.event.MouseEvent evt) {
+            @Override
+            public void mouseEntered(java.awt.event.MouseEvent e) {
                 button.setBackground(BUTTON_HOVER_COLOR);
             }
 
-            public void mouseExited(java.awt.event.MouseEvent evt) {
+            @Override
+            public void mouseExited(java.awt.event.MouseEvent e) {
                 button.setBackground(BUTTON_COLOR);
             }
         });
@@ -158,186 +222,32 @@ public class CombinedWindowFactory implements ToolWindowFactory {
             ProgressManager.getInstance().run(new Task.Backgroundable(project, "处理中", true) {
                 @Override
                 public void run(@NotNull ProgressIndicator indicator) {
-                    if (codeService.generateByStream()) {
-                        messageBuilder.setLength(0);
-                        try {
-                            codeService.generateCommitMessageStream(
-                                    prompt,
-                                    this::handleTokenResponse,
-                                    this::handleErrorResponse
-                            );
-                        } catch (Exception e) {
-                            throw new RuntimeException(e);
+                    messageBuilder.setLength(0); // 重置内容构建器
+                    try {
+                        if (codeService.generateByStream()) {
+                            // 在 handleAskButtonClick 中调用流式生成的地方
+                            codeService.generateCommitMessageStream(prompt,
+                                    token -> {
+                                        messageBuilder.append(token);
+                                        String fullMarkdown = messageBuilder.toString();
+                                        updateResult(fullMarkdown); // 每次都传完整文本，避免断句
+                                    },
+                                    this::handleErrorResponse);
+
                         }
+                    } catch (Exception e) {
+                        handleErrorResponse(e);
                     }
                 }
 
-                private void handleTokenResponse(String token) {
-                    messageBuilder.append(token);
-                    updateResult(messageBuilder.toString());
-                }
-
                 private void handleErrorResponse(Throwable error) {
-                    ApplicationManager.getApplication().invokeLater(() ->
-                            showError(project, "Error generating commit message: " + error.getMessage())
-                    );
+                    ApplicationManager.getApplication().invokeLater(() -> {
+                        IdeaDialogUtil.showError(project, "处理失败: " + error.getMessage(), "Error");
+                    });
                 }
             });
-
         } catch (Exception e) {
-            e.printStackTrace();
-            Messages.showMessageDialog("处理失败！", "错误", Messages.getErrorIcon());
+            Messages.showMessageDialog(project, "处理失败: " + e.getMessage(), "Error", Messages.getErrorIcon());
         }
     }
-
-    private void showError(Project project, String message) {
-        IdeaDialogUtil.showError(project, message, "Error");
-    }
-
-    public static String renderMarkdownToHtmlWithHighlighting(String markdown) {
-        MutableDataSet options = new MutableDataSet();
-        options.set(Parser.EXTENSIONS, Arrays.asList(
-                TablesExtension.create(),
-                FootnoteExtension.create()
-        ));
-
-        Parser parser = Parser.builder(options).build();
-        HtmlRenderer renderer = HtmlRenderer.builder(options).build();
-
-        return renderer.render(parser.parse(markdown));
-    }
-
-    public synchronized void updateResult(String markdownResult) {
-//        buffer.append(markdownResult);
-        ApplicationManager.getApplication().invokeLater(() -> {
-            if (htmlViewer == null) return;
-
-
-            // 使用 flexmark-java 渲染 Markdown 为 HTML
-            String html = renderMarkdownToHtmlWithHighlighting(markdownResult);
-
-            URL iconUrl = CombinedWindowFactory.class.getResource("/icons/fuzhi.png");
-
-            // 获取默认文本前景色
-            Color foreground = getCurrentColorScheme().getDefaultForeground();
-// 获取默认背景色
-            Color background = getCurrentColorScheme().getDefaultBackground();
-
-// 手动设置常见语法元素颜色（可根据实际主题调整）
-            Color keywordColor = new Color(0, 0, 255); // 蓝色
-            Color stringColor = new Color(163, 21, 21); // 红色
-            Color commentColor = new Color(0, 128, 0); // 绿色
-            Color numberColor = new Color(128, 0, 128); // 紫色
-            Color tagColor = new Color(128, 0, 0); // 深红色
-            Color attrColor = new Color(128, 0, 128); // 紫色
-            Color builtInColor = new Color(43, 145, 175); // 蓝绿色
-
-            String htmlWithStyles = """
-                    <!DOCTYPE html>
-                    <html lang="zh-CN">
-                    <head>
-                        <meta charset="UTF-8">
-                        <style>
-                            body {
-                                color: %s;
-                                background-color: %s;
-                                font-family: sans-serif;
-                            }
-                            pre {
-                                border: 1px solid #ccc;
-                                padding: 10px;
-                                background-color: %s;
-                                overflow-x: auto;
-                                position: relative; /* 确保按钮定位基于此 */
-                            }
-                            code {
-                                font-family: monospace;
-                                color: %s;
-                            }
-                            .hl-keyword { color: %s; }
-                            .hl-string   { color: %s; }
-                            .hl-comment  { color: %s; }
-                            .hl-number   { color: %s; }
-                            .hl-tag      { color: %s; }
-                            .hl-attr     { color: %s; }
-                            .hl-built_in { color: %s; }
-                    
-                            .copy-button {
-                                position: absolute;
-                                top: 5px;
-                                right: 5px;
-                                background-color: transparent;
-                                border: none;
-                                padding: 0;
-                                cursor: pointer;
-                            }
-    
-                            .copy-button img {
-                                width: 20px;   /* 修改尺寸 */
-                                height: 20px;
-                            }
-                    
-                        </style>
-                        <script>
-                            function copyCode(element) {
-                                const codeElement = element.parentElement.querySelector('code');
-                                const range = document.createRange();
-                                range.selectNodeContents(codeElement);
-                                const selection = window.getSelection();
-                                selection.removeAllRanges();
-                                selection.addRange(range);
-                    
-                                try {
-                                    document.execCommand('copy');
-                                } finally {
-                                    selection.removeAllRanges();
-                                }
-                            }
-                        </script>
-                    
-                    </head>
-                    <body>
-                        %s
-                    </body>
-                    </html>
-                    """.formatted(
-                    toHexString(foreground),
-                    toHexString(background),
-                    toHexString(background.brighter()),
-                    toHexString(foreground),
-                    toHexString(keywordColor),
-                    toHexString(stringColor),
-                    toHexString(commentColor),
-                    toHexString(numberColor),
-                    toHexString(tagColor),
-                    toHexString(attrColor),
-                    toHexString(builtInColor),
-                    html.replaceAll("<pre>", "<pre><button class=\"copy-button\" onclick=\"copyCode(this)\"><img src=" + iconUrl + " width=\"20\" height=\"20\"/></button>")
-            );
-
-
-            System.out.println("===" + htmlWithStyles);
-            // 滚动到底部
-            SwingUtilities.invokeLater(() -> {
-                if (htmlViewer != null) {
-                    htmlViewer.setText(htmlWithStyles);
-                    // 只刷新而不重新布局
-                    htmlViewer.revalidate();
-                    htmlViewer.repaint();
-                }
-                JScrollBar scrollBar = ((JScrollPane) SwingUtilities.getAncestorOfClass(JScrollPane.class, htmlViewer)).getVerticalScrollBar();
-                if (scrollBar != null) {
-                    scrollBar.setValue(scrollBar.getMaximum());
-                }
-            });
-
-//            buffer.setLength(0); // 清空缓冲区
-        });
-    }
-
-
-    private static String toHexString(Color color) {
-        return String.format("#%02x%02x%02x", color.getRed(), color.getGreen(), color.getBlue());
-    }
-
 }

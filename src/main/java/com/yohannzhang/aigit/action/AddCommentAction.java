@@ -1,8 +1,6 @@
 package com.yohannzhang.aigit.action;
 
 import com.intellij.openapi.fileTypes.StdFileTypes;
-import com.intellij.ui.content.Content;
-import com.intellij.ui.content.ContentFactory;
 import com.yohannzhang.aigit.ui.AIGuiComponent;
 import com.yohannzhang.aigit.ui.CombinedWindowFactory;
 import com.yohannzhang.aigit.constant.Constants;
@@ -95,18 +93,14 @@ public class AddCommentAction extends AnAction {
                 prompt,
                 token -> ApplicationManager.getApplication().invokeLater(() -> {
                     messageBuilder.append(token);
-                    updateToolWindowResult(project,messageBuilder.toString());
+
+                    AIGuiComponent.getInstance(project).getWindowFactory().updateResult(messageBuilder.toString());
                 }),
                 error -> ApplicationManager.getApplication().invokeLater(() ->
                         showError(project, "Error generating commit message: " + error.getMessage()))
         );
     }
-    private void updateToolWindowResult(Project project, String result) {
-        CombinedWindowFactory factory = AIGuiComponent.getInstance(project).getWindowFactory();
-        if (factory != null) {
-            factory.updateResult(result);
-        }
-    }
+
     private void showWarningDialog(String message) {
         Messages.showMessageDialog(message, "Warning", Messages.getWarningIcon());
     }

@@ -110,7 +110,7 @@ public class OptimizeCodeAction extends AnAction {
             private void handleTokenResponse(String token) {
                 ApplicationManager.getApplication().invokeLater(() -> {
                     messageBuilder.append(token);
-                    updateToolWindowResult(project,messageBuilder.toString());
+                    AIGuiComponent.getInstance(project).getWindowFactory().updateResult(messageBuilder.toString());
                 });
             }
 
@@ -121,12 +121,7 @@ public class OptimizeCodeAction extends AnAction {
             }
         });
     }
-    private void updateToolWindowResult(Project project, String result) {
-        CombinedWindowFactory factory = AIGuiComponent.getInstance(project).getWindowFactory();
-        if (factory != null) {
-            factory.updateResult(result);
-        }
-    }
+
     private void showWarningDialog(String message) {
         Messages.showMessageDialog(message, "Warning", Messages.getWarningIcon());
     }

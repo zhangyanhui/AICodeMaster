@@ -11,11 +11,13 @@ import org.jetbrains.annotations.NotNull;
 
 public class WelcomeNotification implements StartupActivity { // 更改为 StartupActivity
 
-    private static final String NOTIFICATION_GROUP_ID = "AI Git Commit Notifications";
-    private static final String PLUGIN_NAME = "AI Git Commit";
-    private static final String WELCOME_TITLE = "Welcome to AI Git Commit!";
-    private static final String WELCOME_CONTENT = "Thank you for installing AI Git Commit. " +
-            "To get started, please configure the plugin in the settings.";
+    private static final String NOTIFICATION_GROUP_ID = "AI Code Master Notifications";
+    private static final String PLUGIN_NAME = "AI Code Master";
+    private static final String WELCOME_TITLE = "Welcome to AI Code Master!";
+    private static final String WELCOME_CONTENT = "Thank you for installing AI Code Master. " +
+            "To get started, please configure the plugin in the settings.\n" +
+            "感谢安装 AI Code Master，请在设置中配置插件以开始使用。";
+
     private static final String PLUGIN_VERSION_PROPERTY = "com.hmydk.aigit.version";
 
     @Override
