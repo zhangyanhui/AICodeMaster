@@ -25,6 +25,7 @@ import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
 import java.awt.*;
+import java.net.URL;
 import java.util.Arrays;
 
 public class CombinedWindowFactory implements ToolWindowFactory {
@@ -36,8 +37,6 @@ public class CombinedWindowFactory implements ToolWindowFactory {
 
     private JTextArea questionTextArea;
     private final StringBuilder messageBuilder = new StringBuilder();
-    private static final String COPY_ICON_PATH = "/icons/copy.png";
-    private static final StringBuilder buffer = new StringBuilder();
     private transient JEditorPane htmlViewer; // 改为实例变量
 
     private static EditorColorsScheme getCurrentColorScheme() {
@@ -84,6 +83,7 @@ public class CombinedWindowFactory implements ToolWindowFactory {
         htmlViewer.setContentType("text/html");
         htmlViewer.setEditable(false);
         htmlViewer.setBackground(backgroundColor);
+        htmlViewer.putClientProperty(JEditorPane.HONOR_DISPLAY_PROPERTIES, Boolean.TRUE); // 启用 JS
 
         JScrollPane scrollPane = new JBScrollPane(htmlViewer);
         outputPanel.add(scrollPane, BorderLayout.CENTER);
@@ -212,59 +212,12 @@ public class CombinedWindowFactory implements ToolWindowFactory {
         ApplicationManager.getApplication().invokeLater(() -> {
             if (htmlViewer == null) return;
 
-//            String fullMarkdown = buffer.toString();
 
             // 使用 flexmark-java 渲染 Markdown 为 HTML
             String html = renderMarkdownToHtmlWithHighlighting(markdownResult);
 
-            // 构造完整的 HTML 页面结构并注入代码高亮样式
-//            String htmlWithStyles = """
-//            <!DOCTYPE html>
-//            <html lang="zh-CN">
-//            <head>
-//                <meta charset="UTF-8">
-//                <style>
-//                    body {
-//                        color: white;
-//                        background-color: grey;
-//                        font-family: sans-serif;
-//                    }
-//                    pre {
-//                        border: 1px solid #ccc;
-//                        padding: 10px;
-//                        background-color: #1e1e1e;
-//                        overflow-x: auto;
-//                    }
-//                    code {
-//                        font-family: monospace;
-//                        color: #dcdcaa;
-//                    }
-//                    .hl-keyword { color: #569cd6; }
-//                    .hl-string   { color: #ce9178; }
-//                    .hl-comment  { color: #6a9955; }
-//                    .hl-number   { color: #b5cea8; }
-//                    .hl-tag      { color: #569cd6; }
-//                    .hl-attr     { color: #9cdcfe; }
-//                    .hl-built_in { color: #4ec9b0; }
-//
-//                    .copy-button {
-//                        position: absolute;
-//                        top: 5px;
-//                        right: 5px;
-//                        background-color: transparent;
-//                        border: none;
-//                        padding: 0;
-//                        cursor: pointer;
-//                    }
-//                    .copy-button img {
-//                        width: 16px;
-//                        height: 16px;
-//                    }
-//                </style>
-//            </head>
-//            <body>%s</body>
-//            </html>
-//            """.formatted(html);
+            URL iconUrl = CombinedWindowFactory.class.getResource("/icons/fuzhi.png");
+
             // 获取默认文本前景色
             Color foreground = getCurrentColorScheme().getDefaultForeground();
 // 获取默认背景色
@@ -295,6 +248,7 @@ public class CombinedWindowFactory implements ToolWindowFactory {
                                 padding: 10px;
                                 background-color: %s;
                                 overflow-x: auto;
+                                position: relative; /* 确保按钮定位基于此 */
                             }
                             code {
                                 font-family: monospace;
@@ -317,18 +271,39 @@ public class CombinedWindowFactory implements ToolWindowFactory {
                                 padding: 0;
                                 cursor: pointer;
                             }
+    
                             .copy-button img {
-                                width: 16px;
-                                height: 16px;
+                                width: 20px;   /* 修改尺寸 */
+                                height: 20px;
                             }
+                    
                         </style>
+                        <script>
+                            function copyCode(element) {
+                                const codeElement = element.parentElement.querySelector('code');
+                                const range = document.createRange();
+                                range.selectNodeContents(codeElement);
+                                const selection = window.getSelection();
+                                selection.removeAllRanges();
+                                selection.addRange(range);
+                    
+                                try {
+                                    document.execCommand('copy');
+                                } finally {
+                                    selection.removeAllRanges();
+                                }
+                            }
+                        </script>
+                    
                     </head>
-                    <body>%s</body>
+                    <body>
+                        %s
+                    </body>
                     </html>
                     """.formatted(
                     toHexString(foreground),
                     toHexString(background),
-                    toHexString(background.brighter()), // 示例：浅一点的背景用于代码块
+                    toHexString(background.brighter()),
                     toHexString(foreground),
                     toHexString(keywordColor),
                     toHexString(stringColor),
@@ -337,10 +312,11 @@ public class CombinedWindowFactory implements ToolWindowFactory {
                     toHexString(tagColor),
                     toHexString(attrColor),
                     toHexString(builtInColor),
-                    html
+                    html.replaceAll("<pre>", "<pre><button class=\"copy-button\" onclick=\"copyCode(this)\"><img src=" + iconUrl + " width=\"20\" height=\"20\"/></button>")
             );
 
 
+            System.out.println("===" + htmlWithStyles);
             // 滚动到底部
             SwingUtilities.invokeLater(() -> {
                 if (htmlViewer != null) {
@@ -358,6 +334,7 @@ public class CombinedWindowFactory implements ToolWindowFactory {
 //            buffer.setLength(0); // 清空缓冲区
         });
     }
+
 
     private static String toHexString(Color color) {
         return String.format("#%02x%02x%02x", color.getRed(), color.getGreen(), color.getBlue());
