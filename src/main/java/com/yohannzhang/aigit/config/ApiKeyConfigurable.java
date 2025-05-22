@@ -65,7 +65,7 @@ public class ApiKeyConfigurable implements Configurable {
 
         // 保存prompt内容
         Object selectedPromptType = ui.getPromptTypeComboBox().getSelectedItem();
-        if (Constants.CUSTOM_PROMPT.equals((String) selectedPromptType)) {
+        if (Constants.CUSTOM_PROMPT.equals(selectedPromptType)) {
             saveCustomPromptsAndChoosedPrompt();
         }
         // 保存prompt类型

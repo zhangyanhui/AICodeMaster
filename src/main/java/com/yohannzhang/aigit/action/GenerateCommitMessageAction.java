@@ -97,7 +97,7 @@ public class GenerateCommitMessageAction extends AnAction {
                                         commitMessage.setCommitMessage(token);
                                     } else {
                                         messageBuilder.append(token);
-                                        commitMessage.setCommitMessage(branch.getName() + ":" + messageBuilder.toString());
+                                        commitMessage.setCommitMessage(branch.getName() + ":" + messageBuilder);
                                     }
                                 }),
                                 // onError 处理错误

@@ -91,6 +91,7 @@
         <!-- 注册工具窗口 -->
         <toolWindow id="AICodeMaster" icon="/icons/git-commit-logo.svg"
                     anchor="right"
+
                     factoryClass="com.yohannzhang.aigit.ui.CombinedWindowFactory"/>
     </extensions>
 

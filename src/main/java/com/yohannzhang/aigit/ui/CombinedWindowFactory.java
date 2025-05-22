@@ -1,6 +1,7 @@
 package com.yohannzhang.aigit.ui;
 
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.editor.colors.EditorColorsListener;
 import com.intellij.openapi.editor.colors.EditorColorsManager;
 import com.intellij.openapi.editor.colors.EditorColorsScheme;
 import com.intellij.openapi.progress.ProgressIndicator;
@@ -14,6 +15,7 @@ import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.content.Content;
 import com.intellij.ui.content.ContentFactory;
 import com.intellij.ui.jcef.JBCefBrowser;
+import com.intellij.util.messages.MessageBusConnection;
 import com.vladsch.flexmark.html.HtmlRenderer;
 import com.vladsch.flexmark.parser.Parser;
 import com.vladsch.flexmark.util.data.MutableDataSet;
@@ -33,13 +35,15 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 
-public class CombinedWindowFactory implements ToolWindowFactory {
+public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsListener {
+    private MessageBusConnection messageBusConnection; // 用于订阅事件总线
     private static final CodeUtil CODE_UTIL = new CodeUtil();
     private static final Font BUTTON_FONT = new Font("SansSerif", Font.BOLD, 14);
     private static final Color BUTTON_COLOR = new Color(32, 86, 105);
     private static final Color BUTTON_HOVER_COLOR = new Color(143, 0, 200);
 
     private JTextArea questionTextArea;
+    private JPanel outputPanel;
     private final StringBuilder messageBuilder = new StringBuilder();
     private JBCefBrowser markdownViewer; // 使用 JBCefBrowser 替换 JEditorPane
     private Color ideBackgroundColor; // 缓存 IDE 背景色
@@ -52,6 +56,8 @@ public class CombinedWindowFactory implements ToolWindowFactory {
     private JButton askButton;
     private JButton cancelButton; // 新增取消按钮成员变量
     private JComboBox<String> modelComboBox;
+    private float fontSize;
+    private Color ideFontColor;
 
 
     static {
@@ -86,7 +92,9 @@ public class CombinedWindowFactory implements ToolWindowFactory {
     public void createToolWindowContent(@NotNull Project project, @NotNull ToolWindow toolWindow) {
         // 初始化 IDE 背景色
         initIdeBackgroundColor();
-
+        // 创建消息连接并监听主题变化
+        messageBusConnection = project.getMessageBus().connect();
+        messageBusConnection.subscribe(EditorColorsManager.TOPIC, this);
         JPanel panel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = createDefaultConstraints();
 
@@ -99,10 +107,72 @@ public class CombinedWindowFactory implements ToolWindowFactory {
         toolWindow.getContentManager().addContent(content);
     }
 
+    private void onThemeChanged(EditorColorsScheme scheme) {
+        ApplicationManager.getApplication().invokeLater(() -> {
+            initIdeBackgroundColor(); // 更新主题色
+            refreshUIOnThemeChange(); // 刷新 UI 样式
+        });
+    }
+
+    @Override
+    public void globalSchemeChange(EditorColorsScheme scheme) {
+        onThemeChanged(scheme);
+    }
+
+    private void refreshUIOnThemeChange() {
+        // 1. 刷新输入面板背景色
+        if (questionTextArea != null) {
+            questionTextArea.setBackground(ideBackgroundColor); // 输入框背景与 IDE 一致
+            questionTextArea.setForeground(ideFontColor); // 文本颜色可根据需要调整
+        }
+        if (outputPanel != null) {
+            outputPanel.setBackground(ideBackgroundColor);
+
+        }
+
+        // 2. 刷新按钮样式
+        if (askButton != null && cancelButton != null) {
+            askButton.setBackground(BUTTON_COLOR);
+            askButton.setForeground(ideFontColor);
+            cancelButton.setBackground(BUTTON_COLOR);
+            cancelButton.setForeground(ideFontColor);
+
+
+        }
+
+        // 3. 刷新下拉框背景
+        if (modelComboBox != null) {
+            modelComboBox.setBackground(ideBackgroundColor);
+            modelComboBox.setForeground(ideFontColor);
+        }
+
+        // 4. 刷新整个面板背景色
+        Component[] components = questionTextArea.getParent().getComponents();
+        for (Component comp : components) {
+            if (comp instanceof JPanel) {
+                comp.setBackground(ideBackgroundColor);
+            }
+        }
+
+        String script = "document.documentElement.style.setProperty('--font-size', '" + fontSize + "px');" +
+                "document.documentElement.style.setProperty('--workspace-color', '" + toHex(ideBackgroundColor) + "');" +
+                "document.documentElement.style.setProperty('--idefont-color', '" + toHex(ideFontColor) + "');";
+
+
+        // 初始加载空 HTML 页面
+        ApplicationManager.getApplication().invokeLater(() -> {
+
+            markdownViewer.getCefBrowser().executeJavaScript(script, "about:blank", 0);
+
+        });
+    }
+
     private void initIdeBackgroundColor() {
         EditorColorsScheme colorsScheme = EditorColorsManager.getInstance().getGlobalScheme();
         ideBackgroundColor = colorsScheme.getDefaultBackground();
-        Color ideFontColor = colorsScheme.getDefaultForeground();
+        ideFontColor = colorsScheme.getDefaultForeground();
+        fontSize = colorsScheme.getEditorFontSize2D();
+
         colorsScheme.getFontPreferences();
     }
 
@@ -123,7 +193,9 @@ public class CombinedWindowFactory implements ToolWindowFactory {
         );
 
         ApplicationManager.getApplication().invokeLater(() -> {
+
             markdownViewer.getCefBrowser().executeJavaScript(script, "about:blank", 0);
+
         });
     }
 
@@ -140,16 +212,24 @@ public class CombinedWindowFactory implements ToolWindowFactory {
     }
 
     private JPanel createOutputPanel(Project project) {
-        JPanel outputPanel = new JPanel(new BorderLayout(10, 10));
+        outputPanel = new JPanel(new BorderLayout(10, 10));
         outputPanel.setBorder(BorderFactory.createTitledBorder("输出结果"));
         outputPanel.setBackground(ideBackgroundColor);
 
         markdownViewer = new JBCefBrowser();
         markdownViewer.getComponent().setBorder(BorderFactory.createEmptyBorder());
         String EMPTY_HTML = readResourceFile("empty.html");
+
+        String script = "document.documentElement.style.setProperty('--font-size', '" + fontSize + "px');" +
+                "document.documentElement.style.setProperty('--workspace-color', '" + toHex(ideBackgroundColor) + "');" +
+                "document.documentElement.style.setProperty('--idefont-color', '" + toHex(ideFontColor) + "');";
+
+
         // 初始加载空 HTML 页面
         ApplicationManager.getApplication().invokeLater(() -> {
             markdownViewer.loadHTML(EMPTY_HTML);
+            markdownViewer.getCefBrowser().executeJavaScript(script, "about:blank", 0);
+
         });
 
         outputPanel.add(markdownViewer.getComponent(), BorderLayout.CENTER);
@@ -157,11 +237,16 @@ public class CombinedWindowFactory implements ToolWindowFactory {
         return outputPanel;
     }
 
+    // 将 Color 对象转换为十六进制颜色字符串
+    private String toHex(Color color) {
+        return String.format("#%02x%02x%02x", color.getRed(), color.getGreen(), color.getBlue());
+    }
 
     private JPanel createInputPanel(Project project) {
         JPanel inputPanel = new JPanel(new BorderLayout(10, 10));
         inputPanel.setBorder(BorderFactory.createTitledBorder("输入问题"));
         inputPanel.setBackground(ideBackgroundColor);
+
         String[] clientArr = ApiKeySettings.getInstance().getAvailableModels();
         // 创建模型选择下拉框
         modelComboBox = new JComboBox<>(clientArr);
@@ -169,7 +254,7 @@ public class CombinedWindowFactory implements ToolWindowFactory {
         modelComboBox.setSelectedItem(ApiKeySettings.getInstance().getSelectedModule());
         modelComboBox.setPreferredSize(new Dimension(120, 30));
         modelComboBox.setBackground(ideBackgroundColor);
-        modelComboBox.setForeground(Color.WHITE);
+        modelComboBox.setForeground(ideFontColor);
         modelComboBox.setFont(new Font("SansSerif", Font.PLAIN, 12));
         //切换模型时处理逻辑，同步设置ApiKeySettings
         // 添加模型切换事件监听器
@@ -197,7 +282,7 @@ public class CombinedWindowFactory implements ToolWindowFactory {
         questionTextArea.setLineWrap(true);
         questionTextArea.setWrapStyleWord(true);
         questionTextArea.setBackground(ideBackgroundColor); // 输入框背景与 IDE 一致
-        questionTextArea.setForeground(Color.WHITE); // 文本颜色可根据需要调整
+        questionTextArea.setForeground(ideFontColor); // 文本颜色可根据需要调整
         questionTextArea.requestFocusInWindow();
         //显示为可编辑
         questionTextArea.setEditable(true);
@@ -248,7 +333,7 @@ public class CombinedWindowFactory implements ToolWindowFactory {
         button.setFont(new Font("SansSerif", Font.BOLD, 14));
         button.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20)); // 增加内边距
         button.setOpaque(true);
-        button.setForeground(Color.WHITE);
+        button.setForeground(ideFontColor);
         button.setFocusPainted(false);
         button.setBorderPainted(true); // 启用边框绘制
         button.setCursor(new Cursor(Cursor.HAND_CURSOR)); // 鼠标悬停时显示手型
@@ -284,26 +369,16 @@ public class CombinedWindowFactory implements ToolWindowFactory {
 
 
     private void handleAskButtonClick(Project project) {
-        //弹窗
-//        JOptionPane.showMessageDialog(null, "请稍等...", "提示", JOptionPane.INFORMATION_MESSAGE);
         String question = questionTextArea.getText().trim();
         if (question.isEmpty()) {
             updateResult("请输入问题！");
             return;
         }
 
-        // 显示加载动画，隐藏按钮（使用 invokeLater 确保在 EDT 执行）
         ApplicationManager.getApplication().invokeLater(() -> {
-//            loadingLabel.setVisible(true);
-            // 如果有 askButton 成员变量，可以取消显示
             askButton.setVisible(false);
             cancelButton.setVisible(true);
         });
-
-        // 先展示问题
-//        String formattedQuestion = "> 问题：" + question + "\n\n -----";
-//        updateResult(formattedQuestion); // 显示问题部分
-//        isInitialResponse = false;
 
         CodeService codeService = new CodeService();
         String formattedCode = CODE_UTIL.formatCode(question);
@@ -326,8 +401,7 @@ public class CombinedWindowFactory implements ToolWindowFactory {
                                     this::handleErrorResponse,
                                     () -> ApplicationManager.getApplication().invokeLater(() -> {
                                         //把以下两行抽成一个方法
-                                        askButton.setVisible(true);
-                                        cancelButton.setVisible(false);
+                                        resetButton();
                                     })
                             );
 
@@ -358,6 +432,8 @@ public class CombinedWindowFactory implements ToolWindowFactory {
         askButton.setVisible(false);
         cancelButton.setVisible(true);
     }
+
+
 
 
 }

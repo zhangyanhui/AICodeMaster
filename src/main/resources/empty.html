@@ -5,13 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Markdown 预览</title>
     <style>
+        :root {
+    --font-size: 14px;
+     --workspace-color: #2B2B2B; /* 定义工作空间颜色 */
+     --idefont-color: #2B2B2B; /* 定义工作空间颜色 */
+
+          }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             line-height: 1.6;
             margin: 0;
             padding: 20px;
-            background-color: #2B2B2B;
-            color: white;
+           background-color: var(--workspace-color);
+           color: var(--idefont-color);
+            font-size: var(--font-size);
+}
         }
         .markdown-body {
             width: 100%;
