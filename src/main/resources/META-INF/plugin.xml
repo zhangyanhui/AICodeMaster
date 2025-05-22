@@ -5,6 +5,7 @@
     <name>AI Code Master</name>
 
     <vendor email="yohannzhang@qq.com">yohannzhang</vendor>
+    <version>1.5.2</version>
 
     <description>
         <![CDATA[
@@ -66,17 +67,15 @@
 
     <!-- Product and plugin compatibility requirements.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
-    <depends>com.intellij.modules.lang</depends>
-    <depends>com.intellij.modules.vcs</depends>
-    <depends>Git4Idea</depends>
-    <project-components>
-        <component>
-            <implementation-class>com.yohannzhang.aigit.ui.AIGuiComponent</implementation-class>
-        </component>
-    </project-components>
-    <!-- Extension points defined by the plugin.
-     Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
+    <depends optional="true" config="false">com.intellij.modules.lang</depends>
+    <depends optional="true" config="false">com.intellij.modules.vcs</depends>
+    <depends optional="true" config="false">Git4Idea</depends>
+
+
+
     <extensions defaultExtensionNs="com.intellij">
+        <projectService serviceImplementation="com.yohannzhang.aigit.ui.AIGuiComponent"/>
+
         <!-- 注册欢迎通知活动 -->
         <postStartupActivity implementation="com.yohannzhang.aigit.action.WelcomeNotification"/>
         <!-- 声明通知组 -->

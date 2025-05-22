@@ -34,6 +34,21 @@ public class ApiKeySettings implements PersistentStateComponent<ApiKeySettings> 
     public static ApiKeySettings getInstance() {
         return ApplicationManager.getApplication().getService(ApiKeySettings.class);
     }
+    //获取apikey不为空的模型列表,按以下格式返回 new String[]{}
+    public String[] getAvailableModels() {
+        String[] result = new String[moduleConfigs.size()];
+        int i = 0;
+        for (Map.Entry<String, ModuleConfig> entry : moduleConfigs.entrySet()) {
+            ModuleConfig config = entry.getValue();
+            if (config != null && config.getApiKey() != null && !config.getApiKey().isEmpty()) {
+                result[i] = entry.getKey();
+                i++;
+            }
+        }
+        return result;
+    }
+
+
 
 
     @Nullable

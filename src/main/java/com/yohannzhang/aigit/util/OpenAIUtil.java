@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.lang.reflect.InvocationTargetException;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -19,6 +20,8 @@ import com.yohannzhang.aigit.config.ApiKeySettings;
 import com.yohannzhang.aigit.pojo.OpenAIRequestBO;
 
 public class OpenAIUtil {
+
+    private static volatile boolean isCancelled = false;
 
     public static boolean checkNecessaryModuleConfigIsRight(String client) {
         ApiKeySettings settings = ApiKeySettings.getInstance();
@@ -48,8 +51,8 @@ public class OpenAIUtil {
         connection.setRequestProperty("Accept-Charset", "UTF-8");
         connection.setRequestProperty("Authorization", "Bearer " + apiKey);
         connection.setDoOutput(true);
-        connection.setConnectTimeout(30000); // 连接超时：10秒
-        connection.setReadTimeout(30000); // 读取超时：10秒
+        connection.setConnectTimeout(30000); // 连接超时：30秒
+        connection.setReadTimeout(30000); // 读取超时：30秒
 
         try (OutputStream os = connection.getOutputStream()) {
             byte[] input = jsonInputString.getBytes(StandardCharsets.UTF_8);
@@ -58,7 +61,13 @@ public class OpenAIUtil {
         return connection;
     }
 
+    public static void cancelRequest() {
+        isCancelled = true;
+    }
+
     public static void getAIResponseStream(String client, String textContent, Consumer<String> onNext) throws Exception {
+        isCancelled = false;
+
         ApiKeySettings settings = ApiKeySettings.getInstance();
         String selectedModule = settings.getSelectedModule();
         ApiKeySettings.ModuleConfig moduleConfig = settings.getModuleConfigs().get(client);
@@ -66,26 +75,45 @@ public class OpenAIUtil {
         HttpURLConnection connection = OpenAIUtil.getHttpURLConnection(moduleConfig.getUrl(), selectedModule,
                 moduleConfig.getApiKey(), textContent);
 
-        // 获取响应的字符集
         String charset = getCharsetFromContentType(connection.getContentType());
-        
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream(), charset))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                if (line.startsWith("data: ")) {
-                    String jsonData = line.substring(6);
-                    if (!"[DONE]".equals(jsonData)) {
-                        ObjectMapper mapper = new ObjectMapper();
-                        JsonNode root = mapper.readTree(jsonData);
-                        JsonNode choices = root.path("choices");
-                        if (choices.isArray() && !choices.isEmpty()) {
-                            String text = choices.get(0).path("delta").path("content").asText();
-                            onNext.accept(text);
+
+        new Thread(() -> {
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream(), charset))) {
+                String line;
+                while ((line = reader.readLine()) != null && !isCancelled) {
+                    if (line.startsWith("data: ")) {
+                        String jsonData = line.substring(6);
+                        if (!"[DONE]".equals(jsonData)) {
+                            ObjectMapper mapper = new ObjectMapper();
+                            JsonNode root = mapper.readTree(jsonData);
+                            JsonNode choices = root.path("choices");
+                            if (choices.isArray() && !choices.isEmpty()) {
+                                String text = choices.get(0).path("delta").path("content").asText();
+                                onNext.accept(text);
+                            }
                         }
                     }
                 }
+            } catch (IOException e) {
+                if (!isCancelled) {
+                    try {
+                        onNext.getClass().getMethod("accept", Object.class).invoke(onNext, e);
+                    } catch (IllegalAccessException ex) {
+                        throw new RuntimeException(ex);
+                    } catch (InvocationTargetException ex) {
+                        throw new RuntimeException(ex);
+                    } catch (NoSuchMethodException ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            } finally {
+                connection.disconnect(); // 确保连接被释放
             }
-        }
+        }).start();
+    }
+
+    public void cancelCurrentRequest() {
+        isCancelled = true;
     }
 
     private static String getCharsetFromContentType(String contentType) {

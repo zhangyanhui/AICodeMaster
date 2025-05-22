@@ -3,7 +3,7 @@
         <!-- 修改为红色渐变 -->
         <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stop-color="" />
-            <stop offset="100%" stop-color="#c0392b" />
+            <stop offset="100%" stop-color="red" />
         </linearGradient>
     </defs>
 

@@ -26,6 +26,10 @@ public class ApiKeyConfigurable implements Configurable {
     public String getDisplayName() {
         return "AI Code Master";
     }
+    //获取当前ui
+    public ApiKeyConfigurableUI getUi() {
+        return ui;
+    }
 
     @Nullable
     @Override

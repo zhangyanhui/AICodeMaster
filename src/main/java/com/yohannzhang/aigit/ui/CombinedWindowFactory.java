@@ -17,9 +17,13 @@ import com.intellij.ui.jcef.JBCefBrowser;
 import com.vladsch.flexmark.html.HtmlRenderer;
 import com.vladsch.flexmark.parser.Parser;
 import com.vladsch.flexmark.util.data.MutableDataSet;
+import com.yohannzhang.aigit.config.ApiKeyConfigurableUI;
+import com.yohannzhang.aigit.config.ApiKeySettings;
+import com.yohannzhang.aigit.constant.Constants;
 import com.yohannzhang.aigit.service.CodeService;
 import com.yohannzhang.aigit.util.CodeUtil;
 import com.yohannzhang.aigit.util.IdeaDialogUtil;
+import com.yohannzhang.aigit.util.OpenAIUtil;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
@@ -28,24 +32,26 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.net.URL;
 
 public class CombinedWindowFactory implements ToolWindowFactory {
     private static final CodeUtil CODE_UTIL = new CodeUtil();
     private static final Font BUTTON_FONT = new Font("SansSerif", Font.BOLD, 14);
-    private static final Color BUTTON_COLOR = new Color(0, 120, 215);
-    private static final Color BUTTON_HOVER_COLOR = new Color(0, 100, 200);
+    private static final Color BUTTON_COLOR = new Color(32, 86, 105);
+    private static final Color BUTTON_HOVER_COLOR = new Color(143, 0, 200);
 
     private JTextArea questionTextArea;
     private final StringBuilder messageBuilder = new StringBuilder();
-    private  JBCefBrowser markdownViewer; // 使用 JBCefBrowser 替换 JEditorPane
-    private  Color ideBackgroundColor; // 缓存 IDE 背景色
+    private JBCefBrowser markdownViewer; // 使用 JBCefBrowser 替换 JEditorPane
+    private Color ideBackgroundColor; // 缓存 IDE 背景色
 
     // 初始化 Flexmark 配置（仅执行一次）
     private static final Parser parser;
     private static final HtmlRenderer renderer;
-
-
+    //    private JLabel loadingLabel; // 新增成员变量
+//    private boolean isInitialResponse = true; // 标记是否是第一次响应（即刚提交问题）
+    private JButton askButton;
+    private JButton cancelButton; // 新增取消按钮成员变量
+    private JComboBox<String> modelComboBox;
 
 
     static {
@@ -53,6 +59,7 @@ public class CombinedWindowFactory implements ToolWindowFactory {
         parser = Parser.builder(options).build();
         renderer = HtmlRenderer.builder(options).build();
     }
+
     /**
      * 读取 classpath 中的资源文件并返回字符串
      */
@@ -121,10 +128,6 @@ public class CombinedWindowFactory implements ToolWindowFactory {
     }
 
 
-
-
-
-
     private GridBagConstraints createDefaultConstraints() {
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(10, 10, 10, 10);
@@ -159,64 +162,154 @@ public class CombinedWindowFactory implements ToolWindowFactory {
         JPanel inputPanel = new JPanel(new BorderLayout(10, 10));
         inputPanel.setBorder(BorderFactory.createTitledBorder("输入问题"));
         inputPanel.setBackground(ideBackgroundColor);
+        String[] clientArr = ApiKeySettings.getInstance().getAvailableModels();
+        // 创建模型选择下拉框
+        modelComboBox = new JComboBox<>(clientArr);
+        //设置默认值
+        modelComboBox.setSelectedItem(ApiKeySettings.getInstance().getSelectedModule());
+        modelComboBox.setPreferredSize(new Dimension(120, 30));
+        modelComboBox.setBackground(ideBackgroundColor);
+        modelComboBox.setForeground(Color.WHITE);
+        modelComboBox.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        //切换模型时处理逻辑，同步设置ApiKeySettings
+        // 添加模型切换事件监听器
+        modelComboBox.addActionListener(e -> {
+            // 更新 ApiKeyConfigurableUI 中的模型选择
+            ApiKeyConfigurableUI ui = new ApiKeyConfigurableUI();
+            String selectedClient = (String) modelComboBox.getSelectedItem();
+            ApiKeySettings.getInstance().setSelectedClient(selectedClient);
 
-        questionTextArea = new JTextArea(5, 50);
+            ui.updateModuleComboBox(selectedClient);
+            String[] modleArr = Constants.CLIENT_MODULES.get(selectedClient);
+            if(modleArr != null){
+                ui.updateModuleComboBox(modleArr[0]);
+                ApiKeySettings.getInstance().setSelectedModule(modleArr[0]);
+            }
+
+        });
+
+        // 使用 JPanel 包裹下拉框，便于布局控制
+        JPanel leftPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        leftPanel.setBackground(ideBackgroundColor);
+        leftPanel.add(modelComboBox);
+
+        questionTextArea = new JTextArea(3, 50);
         questionTextArea.setLineWrap(true);
         questionTextArea.setWrapStyleWord(true);
         questionTextArea.setBackground(ideBackgroundColor); // 输入框背景与 IDE 一致
         questionTextArea.setForeground(Color.WHITE); // 文本颜色可根据需要调整
+        questionTextArea.requestFocusInWindow();
+        //显示为可编辑
+        questionTextArea.setEditable(true);
 
-        inputPanel.add(new JBScrollPane(questionTextArea), BorderLayout.CENTER);
-        inputPanel.add(createButtonPanel(project), BorderLayout.SOUTH);
+        // 创建按钮面板并添加组件
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        buttonPanel.setBackground(ideBackgroundColor);
+        askButton = createStyledButton("提交");
+        cancelButton = createStyledButton("取消");
+        cancelButton.setVisible(false); // 初始隐藏
+
+        // 为 askButton 添加点击事件处理
+        askButton.addActionListener(e -> handleAskButtonClick(project));
+        // 为 cancelButton 添加点击事件处理
+        cancelButton.addActionListener(e -> handleCancel());
+
+        buttonPanel.add(askButton);
+        buttonPanel.add(cancelButton);
+
+        // 创建包含下拉框和按钮的面板
+        JPanel topPanel = new JPanel(new BorderLayout());
+        topPanel.setBackground(ideBackgroundColor);
+        topPanel.add(leftPanel, BorderLayout.WEST);
+        topPanel.add(buttonPanel, BorderLayout.EAST);
+
+        // 添加所有组件到输入面板
+        inputPanel.add(topPanel, BorderLayout.SOUTH); // 模型选择和按钮在顶部
+        inputPanel.add(new JBScrollPane(questionTextArea), BorderLayout.CENTER); // 输入区域在中间
+
         AIGuiComponent.getInstance(project).setWindowFactory(this);
 
         return inputPanel;
     }
 
-    private JPanel createButtonPanel(Project project) {
-        JButton askButton = createStyledButton("提交问题");
-        askButton.addActionListener(event -> handleAskButtonClick(project));
 
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        buttonPanel.setBackground(ideBackgroundColor); // 按钮面板背景与 IDE 一致
-        buttonPanel.add(askButton);
-        return buttonPanel;
+    private void handleCancel() {
+        OpenAIUtil.cancelRequest();
+        ApplicationManager.getApplication().invokeLater(() -> {
+//            loadingLabel.setVisible(false);
+            askButton.setVisible(true);
+            cancelButton.setVisible(false);
+        });
     }
+
 
     private JButton createStyledButton(String text) {
         JButton button = new JButton(text);
-        button.setFont(BUTTON_FONT);
-        button.setBorderPainted(false);
+        button.setFont(new Font("SansSerif", Font.BOLD, 14));
+        button.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20)); // 增加内边距
         button.setOpaque(true);
-        button.setBackground(BUTTON_COLOR);
         button.setForeground(Color.WHITE);
         button.setFocusPainted(false);
+        button.setBorderPainted(true); // 启用边框绘制
+        button.setCursor(new Cursor(Cursor.HAND_CURSOR)); // 鼠标悬停时显示手型
+
+        // 设置按钮的 preferredSize
+        button.setPreferredSize(new Dimension(80, 30));
+
+        // 圆角效果
+        button.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(22, 93, 255), 2),
+                BorderFactory.createEmptyBorder(10, 20, 10, 20)
+        ));
+
+        // 设置默认背景颜色
+        button.setBackground(BUTTON_COLOR);
 
         // 鼠标悬停效果
         button.addMouseListener(new java.awt.event.MouseAdapter() {
             @Override
             public void mouseEntered(java.awt.event.MouseEvent e) {
-                button.setBackground(BUTTON_HOVER_COLOR);
+                button.setBackground(new Color(13, 46, 136));
             }
 
             @Override
             public void mouseExited(java.awt.event.MouseEvent e) {
+                // 设置背景颜色为默认颜色
                 button.setBackground(BUTTON_COLOR);
             }
         });
+
         return button;
     }
 
+
+
+
     private void handleAskButtonClick(Project project) {
+        //弹窗
+//        JOptionPane.showMessageDialog(null, "请稍等...", "提示", JOptionPane.INFORMATION_MESSAGE);
         String question = questionTextArea.getText().trim();
         if (question.isEmpty()) {
             updateResult("请输入问题！");
             return;
         }
 
+        // 显示加载动画，隐藏按钮（使用 invokeLater 确保在 EDT 执行）
+        ApplicationManager.getApplication().invokeLater(() -> {
+//            loadingLabel.setVisible(true);
+            // 如果有 askButton 成员变量，可以取消显示
+            askButton.setVisible(false);
+            cancelButton.setVisible(true);
+        });
+
+        // 先展示问题
+//        String formattedQuestion = "> 问题：" + question + "\n\n -----";
+//        updateResult(formattedQuestion); // 显示问题部分
+//        isInitialResponse = false;
+
         CodeService codeService = new CodeService();
         String formattedCode = CODE_UTIL.formatCode(question);
-        String prompt = String.format("根据提出的问题作出回答，以Java作为默认编程语言输出，用中文回答，问题如下：%s", formattedCode);
+        String prompt = String.format("根据提出的问题作出回答，用中文回答；若需编程，请给出示例，以Java作为默认编程语言输出；问题如下：%s", formattedCode);
 
         try {
             ProgressManager.getInstance().run(new Task.Backgroundable(project, "处理中", true) {
@@ -225,18 +318,21 @@ public class CombinedWindowFactory implements ToolWindowFactory {
                     messageBuilder.setLength(0); // 重置内容构建器
                     try {
                         if (codeService.generateByStream()) {
-                            // 在 handleAskButtonClick 中调用流式生成的地方
                             codeService.generateCommitMessageStream(prompt,
                                     token -> {
                                         messageBuilder.append(token);
                                         String fullMarkdown = messageBuilder.toString();
+
                                         updateResult(fullMarkdown); // 每次都传完整文本，避免断句
                                     },
                                     this::handleErrorResponse);
-
                         }
                     } catch (Exception e) {
                         handleErrorResponse(e);
+                    } finally {
+                        askButton.setVisible(true);
+                        cancelButton.setVisible(false);
+
                     }
                 }
 
@@ -250,4 +346,6 @@ public class CombinedWindowFactory implements ToolWindowFactory {
             Messages.showMessageDialog(project, "处理失败: " + e.getMessage(), "Error", Messages.getErrorIcon());
         }
     }
+
+
 }

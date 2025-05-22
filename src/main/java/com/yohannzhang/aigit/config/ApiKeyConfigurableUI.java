@@ -1,9 +1,5 @@
 package com.yohannzhang.aigit.config;
 
-import com.yohannzhang.aigit.constant.Constants;
-import com.yohannzhang.aigit.service.AIService;
-import com.yohannzhang.aigit.service.CommitMessageService;
-import com.yohannzhang.aigit.util.PromptDialogUIUtil;
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
@@ -14,13 +10,14 @@ import com.intellij.ui.ToolbarDecorator;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.table.JBTable;
 import com.intellij.util.ui.JBUI;
+import com.yohannzhang.aigit.constant.Constants;
+import com.yohannzhang.aigit.service.AIService;
+import com.yohannzhang.aigit.service.CommitMessageService;
+import com.yohannzhang.aigit.util.PromptDialogUIUtil;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
-import java.net.URI;
 
 public class ApiKeyConfigurableUI {
 
@@ -91,6 +88,13 @@ public class ApiKeyConfigurableUI {
 
         // 初始化模块下拉框
         updateModuleComboBox((String) clientComboBox.getSelectedItem());
+    }
+    public void updateModuleSetting(String selectedClient) {
+        updateModuleComboBox(selectedClient);
+        initComponents();
+        layoutComponents();
+        setupListeners();
+//        updateStreamStatus(streamLabel, selectedClient);
     }
 
     private void layoutComponents() {
@@ -245,9 +249,9 @@ public class ApiKeyConfigurableUI {
             int selectedRow = customPromptsTable.getSelectedRow();
             if (selectedRow != -1) {
                 int result = Messages.showYesNoDialog(
-                    "Are you sure you want to delete this custom prompt?",
-                    "Confirm Deletion",
-                    Messages.getQuestionIcon()
+                        "Are you sure you want to delete this custom prompt?",
+                        "Confirm Deletion",
+                        Messages.getQuestionIcon()
                 );
                 if (result == Messages.YES) {
                     customPromptsTableModel.removeRow(selectedRow);
@@ -267,7 +271,7 @@ public class ApiKeyConfigurableUI {
 
                 UIManager.put("OptionPane.okButtonText", "OK");
                 UIManager.put("OptionPane.cancelButtonText", "Cancel");
-                
+
                 int result = JOptionPane.showConfirmDialog(mainPanel, promptDialogUI.getPanel(), "Update Your Prompt",
                         JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
 
@@ -292,7 +296,7 @@ public class ApiKeyConfigurableUI {
         configButton.addActionListener(e -> showModuleConfigDialog());
     }
 
-    private void updateModuleComboBox(String selectedClient) {
+    public void updateModuleComboBox(String selectedClient) {
         moduleComboBox.removeAllItems();
         String[] modules = Constants.CLIENT_MODULES.get(selectedClient);
         if (modules != null) {
@@ -353,7 +357,7 @@ public class ApiKeyConfigurableUI {
         return clientComboBox;
     }
 
-    private void updateStreamStatus(JLabel streamLabel, String selectedClient) {
+    public void updateStreamStatus(JLabel streamLabel, String selectedClient) {
         AIService aiService = CommitMessageService.getAIService(selectedClient);
         boolean supportsStream = aiService.generateByStream();
         streamLabel.setText(supportsStream ? "(Supports Stream)" : "(No Stream)");
