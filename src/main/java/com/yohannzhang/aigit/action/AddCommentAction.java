@@ -89,16 +89,46 @@ public class AddCommentAction extends AnAction {
     private void generateCommentMessage(Project project, CodeService codeService, String prompt) throws Exception {
         messageBuilder.setLength(0);
 //        CombinedWindowFactory combinedWindowFactory = project.getComponent(CombinedWindowFactory.class);
-        codeService.generateCommitMessageStream(
-                prompt,
-                token -> ApplicationManager.getApplication().invokeLater(() -> {
-                    messageBuilder.append(token);
+        ProgressManager.getInstance().run(new Task.Backgroundable(project, Constants.TASK_TITLE, true) {
+            @Override
+            public void run(@NotNull ProgressIndicator indicator) {
+                try {
+                    if (codeService.generateByStream()) {
+                        messageBuilder.setLength(0);
+                        codeService.generateCommitMessageStream(
+                                prompt,
+                                token -> {
+                                    messageBuilder.append(token);
+                                    String fullMarkdown = messageBuilder.toString();
+                                    handleTokenResponse(fullMarkdown);
+                                },
+                                this::handleErrorResponse,
+                                () -> ApplicationManager.getApplication().invokeLater(() -> {
+                                    AIGuiComponent.getInstance(project).getWindowFactory().resetButton();
+                                })
+                        );
+                    }
+                } catch (IllegalArgumentException ex) {
+                    showConfigWarning(project, ex);
+                } catch (Exception ex) {
+                    showError(project, "Error generating commit message: " + ex.getMessage());
+                }
+            }
 
+            private void handleTokenResponse(String token) {
+                ApplicationManager.getApplication().invokeLater(() -> {
+//                    messageBuilder.append(token);
                     AIGuiComponent.getInstance(project).getWindowFactory().updateResult(messageBuilder.toString());
-                }),
-                error -> ApplicationManager.getApplication().invokeLater(() ->
-                        showError(project, "Error generating commit message: " + error.getMessage()))
-        );
+                    AIGuiComponent.getInstance(project).getWindowFactory().submitButton();
+                });
+            }
+
+            private void handleErrorResponse(Throwable error) {
+                ApplicationManager.getApplication().invokeLater(() -> {
+                    showError(project, "Error generating commit message: " + error.getMessage());
+                });
+            }
+        });
     }
 
     private void showWarningDialog(String message) {

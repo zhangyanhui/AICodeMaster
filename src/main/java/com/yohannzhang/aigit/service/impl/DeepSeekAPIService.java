@@ -17,9 +17,14 @@ public class DeepSeekAPIService implements AIService {
         return "null";
     }
 
+//    @Override
+//    public void generateCommitMessageStream(String content, Consumer<String> onNext) throws Exception {
+//        OpenAIUtil.getAIResponseStream(Constants.DeepSeek, content, onNext);
+//    }
+
     @Override
-    public void generateCommitMessageStream(String content, Consumer<String> onNext) throws Exception {
-        OpenAIUtil.getAIResponseStream(Constants.DeepSeek, content, onNext);
+    public void generateCommitMessageStream(String prompt, Consumer<String> onNext, Consumer<Throwable> onError, Runnable onComplete) throws Exception {
+        OpenAIUtil.getAIResponseStream(Constants.DeepSeek, prompt, onNext, onError, onComplete);
     }
 
     @Override

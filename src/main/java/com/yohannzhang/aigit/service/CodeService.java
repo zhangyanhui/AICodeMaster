@@ -27,11 +27,10 @@ public class CodeService {
         return aiService.generateCommitMessage(prompt);
     }
 
-    public void generateCommitMessageStream(String prompt, Consumer<String> onNext, Consumer<Throwable> onError) throws Exception{
-       // String prompt = PromptUtil.constructPrompt(diff);
-        //System.out.println(prompt);
-        aiService.generateCommitMessageStream(prompt, onNext);
+    public void generateCommitMessageStream(String prompt, Consumer<String> onNext, Consumer<Throwable> onError, Runnable onComplete) throws Exception {
+        aiService.generateCommitMessageStream(prompt, onNext, onError, onComplete);
     }
+
 
     public boolean generateByStream() {
         return aiService.generateByStream();

@@ -65,7 +65,7 @@ public class OpenAIUtil {
         isCancelled = true;
     }
 
-    public static void getAIResponseStream(String client, String textContent, Consumer<String> onNext) throws Exception {
+    public static void getAIResponseStream(String client, String textContent, Consumer<String> onNext, Consumer<Throwable> onError, Runnable onComplete) throws Exception {
         isCancelled = false;
 
         ApiKeySettings settings = ApiKeySettings.getInstance();
@@ -107,14 +107,14 @@ public class OpenAIUtil {
                     }
                 }
             } finally {
+                // 流结束时触发 onComplete
+                onComplete.run();
                 connection.disconnect(); // 确保连接被释放
             }
         }).start();
     }
 
-    public void cancelCurrentRequest() {
-        isCancelled = true;
-    }
+
 
     private static String getCharsetFromContentType(String contentType) {
         if (contentType != null) {
@@ -128,4 +128,6 @@ public class OpenAIUtil {
         }
         return StandardCharsets.UTF_8.name(); // 默认使用UTF-8
     }
+
+
 }

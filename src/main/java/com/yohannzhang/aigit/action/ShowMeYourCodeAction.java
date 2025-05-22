@@ -21,6 +21,8 @@ import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.openapi.wm.ToolWindowManager;
 import org.jetbrains.annotations.NotNull;
 
+import static com.intellij.openapi.diff.impl.patch.formove.PatchApplier.showError;
+
 public class ShowMeYourCodeAction extends AnAction {
 
     private static final CodeUtil codeUtil = new CodeUtil();
@@ -53,7 +55,7 @@ public class ShowMeYourCodeAction extends AnAction {
                 toolWindow.show(() -> {
                 });
                 // 根据配置，创建对应的服务
-                CodeService accountService =  new CodeService();
+                CodeService codeService =  new CodeService();
                 String code = ShowMeYourCodeAction.codeUtil.formatCode(selectedText);
                 String prompt = "你是一个Java代码开发专家，请根据给定的文字描述，用中文生成相应的代码及注释，格式分三部分：1.文字描述 2.代码及注释，对应注释在代码上方 3.总结。文字如下：" + code;
                 // Run the time-consuming operations in a background task
@@ -65,23 +67,19 @@ public class ShowMeYourCodeAction extends AnAction {
 
                             //  String diff = GItCommitUtil.computeDiff(includedChanges, includedUnversionedFiles, project);
 //                    System.out.println("diff: " + diff);
-                            if (accountService.generateByStream()) {
+                            if (codeService.generateByStream()) {
                                 messageBuilder.setLength(0);
-                                accountService.generateCommitMessageStream(
+                                codeService.generateCommitMessageStream(
                                         prompt,
-                                        // onNext 处理每个token
-                                        token -> ApplicationManager.getApplication().invokeLater(() -> {
-                                            if (messageBuilder.isEmpty()) {
-                                                messageBuilder.append(token);
-                                                AIGuiComponent.getInstance(project).getWindowFactory().updateResult(messageBuilder.toString());
-                                            } else {
-                                                messageBuilder.append(token);
-                                                AIGuiComponent.getInstance(project).getWindowFactory().updateResult(messageBuilder.toString());
-                                            }
-                                        }),
-                                        // onError 处理错误
-                                        error -> ApplicationManager.getApplication().invokeLater(() -> {
-                                            IdeaDialogUtil.showError(project, "Error generating commit message: " + error.getMessage(), "Error");
+                                        token -> {
+                                            messageBuilder.append(token);
+                                            String fullMarkdown = messageBuilder.toString();
+                                            handleTokenResponse(fullMarkdown);
+                                        },
+                                        this::handleErrorResponse,
+                                        () -> ApplicationManager.getApplication().invokeLater(() -> {
+                                            AIGuiComponent.getInstance(project).getWindowFactory().resetButton();
+
                                         })
                                 );
                             } else {
@@ -96,6 +94,20 @@ public class ShowMeYourCodeAction extends AnAction {
                         } catch (Exception ex) {
                             IdeaDialogUtil.showError(project, "Error generating commit message: " + ex.getMessage(), "Error");
                         }
+                    }
+                    private void handleTokenResponse(String token) {
+                        ApplicationManager.getApplication().invokeLater(() -> {
+//                            messageBuilder.append(token);
+                            AIGuiComponent.getInstance(project).getWindowFactory().updateResult(messageBuilder.toString());
+                            AIGuiComponent.getInstance(project).getWindowFactory().submitButton();
+
+                        });
+                    }
+
+                    private void handleErrorResponse(Throwable error) {
+                        ApplicationManager.getApplication().invokeLater(() -> {
+                            showError(project, "Error generating commit message: " + error.getMessage());
+                        });
                     }
                 });
             }

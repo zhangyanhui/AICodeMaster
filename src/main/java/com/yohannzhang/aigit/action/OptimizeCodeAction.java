@@ -96,8 +96,16 @@ public class OptimizeCodeAction extends AnAction {
                         messageBuilder.setLength(0);
                         codeService.generateCommitMessageStream(
                                 prompt,
-                                this::handleTokenResponse,
-                                this::handleErrorResponse
+                                token -> {
+                                    messageBuilder.append(token);
+                                    String fullMarkdown = messageBuilder.toString();
+                                    handleTokenResponse(fullMarkdown);
+                                },
+                                this::handleErrorResponse,
+                                () -> ApplicationManager.getApplication().invokeLater(() -> {
+                                    AIGuiComponent.getInstance(project).getWindowFactory().resetButton();
+
+                                })
                         );
                     }
                 } catch (IllegalArgumentException ex) {
@@ -109,8 +117,10 @@ public class OptimizeCodeAction extends AnAction {
 
             private void handleTokenResponse(String token) {
                 ApplicationManager.getApplication().invokeLater(() -> {
-                    messageBuilder.append(token);
+//                    messageBuilder.append(token);
                     AIGuiComponent.getInstance(project).getWindowFactory().updateResult(messageBuilder.toString());
+                    AIGuiComponent.getInstance(project).getWindowFactory().submitButton();
+
                 });
             }
 

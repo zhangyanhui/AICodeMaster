@@ -318,21 +318,24 @@ public class CombinedWindowFactory implements ToolWindowFactory {
                     messageBuilder.setLength(0); // 重置内容构建器
                     try {
                         if (codeService.generateByStream()) {
-                            codeService.generateCommitMessageStream(prompt,
+                            codeService.generateCommitMessageStream(
+                                    prompt,
                                     token -> {
                                         messageBuilder.append(token);
                                         String fullMarkdown = messageBuilder.toString();
-
-                                        updateResult(fullMarkdown); // 每次都传完整文本，避免断句
+                                        updateResult(fullMarkdown);
                                     },
-                                    this::handleErrorResponse);
+                                    this::handleErrorResponse,
+                                    () -> ApplicationManager.getApplication().invokeLater(() -> {
+                                        //把以下两行抽成一个方法
+                                        askButton.setVisible(true);
+                                        cancelButton.setVisible(false);
+                                    })
+                            );
+
                         }
                     } catch (Exception e) {
                         handleErrorResponse(e);
-                    } finally {
-                        askButton.setVisible(true);
-                        cancelButton.setVisible(false);
-
                     }
                 }
 
@@ -346,6 +349,16 @@ public class CombinedWindowFactory implements ToolWindowFactory {
             Messages.showMessageDialog(project, "处理失败: " + e.getMessage(), "Error", Messages.getErrorIcon());
         }
     }
+    //把以下两行抽成一个方法
+    public void resetButton() {
+        askButton.setVisible(true);
+        cancelButton.setVisible(false);
+    }
+    public void submitButton() {
+        askButton.setVisible(false);
+        cancelButton.setVisible(true);
+    }
+
 
 
 }

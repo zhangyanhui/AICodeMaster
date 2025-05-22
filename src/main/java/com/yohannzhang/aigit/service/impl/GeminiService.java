@@ -47,7 +47,7 @@ public class GeminiService implements AIService {
     }
 
     @Override
-    public void generateCommitMessageStream(String content, Consumer<String> onNext)
+    public void generateCommitMessageStream(String content, Consumer<String> onNext, Consumer<Throwable> onError, Runnable onComplete)
             throws Exception {
         getAIResponseStream(content, onNext);
     }

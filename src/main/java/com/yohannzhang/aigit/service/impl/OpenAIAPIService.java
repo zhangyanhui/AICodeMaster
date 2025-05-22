@@ -27,11 +27,14 @@ public class OpenAIAPIService implements AIService {
         return "null";
     }
 
+//    @Override
+//    public void generateCommitMessageStream(String content, Consumer<String> onNext) throws Exception {
+//        OpenAIUtil.getAIResponseStream(Constants.OpenAI_API, content, onNext);
+//    }
     @Override
-    public void generateCommitMessageStream(String content, Consumer<String> onNext) throws Exception {
-        OpenAIUtil.getAIResponseStream(Constants.OpenAI_API, content, onNext);
+    public void generateCommitMessageStream(String prompt, Consumer<String> onNext, Consumer<Throwable> onError, Runnable onComplete) throws Exception {
+        OpenAIUtil.getAIResponseStream(Constants.OpenAI_API, prompt, onNext, onError, onComplete);
     }
-
     @Override
     public boolean checkNecessaryModuleConfigIsRight() {
         return OpenAIUtil.checkNecessaryModuleConfigIsRight(Constants.OpenAI_API);
