@@ -3,7 +3,6 @@ package com.yohannzhang.aigit.service;
 
 import com.yohannzhang.aigit.config.ApiKeySettings;
 import com.yohannzhang.aigit.constant.Constants;
-
 import com.yohannzhang.aigit.service.impl.*;
 
 import java.util.function.Consumer;
@@ -22,8 +21,8 @@ public class CodeService {
         return aiService.checkNecessaryModuleConfigIsRight();
     }
 
-    public String generateCommitMessage(String prompt) throws Exception{
-      //  String prompt = PromptUtil.constructPrompt(diff);
+    public String generateCommitMessage(String prompt) throws Exception {
+        //  String prompt = PromptUtil.constructPrompt(diff);
         return aiService.generateCommitMessage(prompt);
     }
 

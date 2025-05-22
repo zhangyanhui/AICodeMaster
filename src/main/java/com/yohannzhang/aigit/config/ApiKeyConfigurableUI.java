@@ -89,6 +89,7 @@ public class ApiKeyConfigurableUI {
         // 初始化模块下拉框
         updateModuleComboBox((String) clientComboBox.getSelectedItem());
     }
+
     public void updateModuleSetting(String selectedClient) {
         updateModuleComboBox(selectedClient);
         initComponents();

@@ -1,12 +1,12 @@
 package com.yohannzhang.aigit.config;
 
-import com.yohannzhang.aigit.constant.Constants;
-import com.yohannzhang.aigit.pojo.PromptInfo;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.PersistentStateComponent;
 import com.intellij.openapi.components.State;
 import com.intellij.openapi.components.Storage;
 import com.intellij.util.xmlb.XmlSerializerUtil;
+import com.yohannzhang.aigit.constant.Constants;
+import com.yohannzhang.aigit.pojo.PromptInfo;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -15,7 +15,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-@State(name = "com.yohannzhang.aigit.config.ApiKeySettings", storages = { @Storage("AICodeMasterettings.xml") })
+@State(name = "com.yohannzhang.aigit.config.ApiKeySettings", storages = {@Storage("AICodeMasterettings.xml")})
 public class ApiKeySettings implements PersistentStateComponent<ApiKeySettings> {
     private String selectedClient = "Gemini";
     private String selectedModule = "gemini-2.0-flash-exp";
@@ -34,6 +34,7 @@ public class ApiKeySettings implements PersistentStateComponent<ApiKeySettings> 
     public static ApiKeySettings getInstance() {
         return ApplicationManager.getApplication().getService(ApiKeySettings.class);
     }
+
     //获取apikey不为空的模型列表,按以下格式返回 new String[]{}
     public String[] getAvailableModels() {
         String[] result = new String[moduleConfigs.size()];
@@ -47,8 +48,6 @@ public class ApiKeySettings implements PersistentStateComponent<ApiKeySettings> 
         }
         return result;
     }
-
-
 
 
     @Nullable

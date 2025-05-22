@@ -3,7 +3,6 @@ package com.yohannzhang.aigit.service;
 
 import com.yohannzhang.aigit.config.ApiKeySettings;
 import com.yohannzhang.aigit.constant.Constants;
-
 import com.yohannzhang.aigit.service.impl.*;
 import com.yohannzhang.aigit.util.PromptUtil;
 
@@ -23,15 +22,15 @@ public class CommitMessageService {
         return aiService.checkNecessaryModuleConfigIsRight();
     }
 
-    public String generateCommitMessage(String diff) throws Exception{
+    public String generateCommitMessage(String diff) throws Exception {
         String prompt = PromptUtil.constructPrompt(diff);
         return aiService.generateCommitMessage(prompt);
     }
 
-    public void generateCommitMessageStream(String diff, Consumer<String> onNext, Consumer<Throwable> onError) throws Exception{
+    public void generateCommitMessageStream(String diff, Consumer<String> onNext, Consumer<Throwable> onError) throws Exception {
         String prompt = PromptUtil.constructPrompt(diff);
         System.out.println(prompt);
-        aiService.generateCommitMessageStream(prompt, onNext,null,null);
+        aiService.generateCommitMessageStream(prompt, onNext, null, null);
     }
 
     public boolean generateByStream() {

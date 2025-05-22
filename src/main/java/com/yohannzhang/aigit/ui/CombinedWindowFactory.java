@@ -181,7 +181,7 @@ public class CombinedWindowFactory implements ToolWindowFactory {
 
             ui.updateModuleComboBox(selectedClient);
             String[] modleArr = Constants.CLIENT_MODULES.get(selectedClient);
-            if(modleArr != null){
+            if (modleArr != null) {
                 ui.updateModuleComboBox(modleArr[0]);
                 ApiKeySettings.getInstance().setSelectedModule(modleArr[0]);
             }
@@ -283,8 +283,6 @@ public class CombinedWindowFactory implements ToolWindowFactory {
     }
 
 
-
-
     private void handleAskButtonClick(Project project) {
         //弹窗
 //        JOptionPane.showMessageDialog(null, "请稍等...", "提示", JOptionPane.INFORMATION_MESSAGE);
@@ -349,16 +347,17 @@ public class CombinedWindowFactory implements ToolWindowFactory {
             Messages.showMessageDialog(project, "处理失败: " + e.getMessage(), "Error", Messages.getErrorIcon());
         }
     }
+
     //把以下两行抽成一个方法
     public void resetButton() {
         askButton.setVisible(true);
         cancelButton.setVisible(false);
     }
+
     public void submitButton() {
         askButton.setVisible(false);
         cancelButton.setVisible(true);
     }
-
 
 
 }

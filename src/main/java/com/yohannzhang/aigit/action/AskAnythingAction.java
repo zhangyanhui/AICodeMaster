@@ -1,12 +1,5 @@
 package com.yohannzhang.aigit.action;
 
-import com.intellij.openapi.fileTypes.StdFileTypes;
-import com.yohannzhang.aigit.ui.AIGuiComponent;
-import com.yohannzhang.aigit.ui.CombinedWindowFactory;
-import com.yohannzhang.aigit.constant.Constants;
-import com.yohannzhang.aigit.service.CodeService;
-import com.yohannzhang.aigit.util.CodeUtil;
-import com.yohannzhang.aigit.util.IdeaDialogUtil;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
@@ -19,6 +12,11 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.openapi.wm.ToolWindowManager;
+import com.yohannzhang.aigit.constant.Constants;
+import com.yohannzhang.aigit.service.CodeService;
+import com.yohannzhang.aigit.ui.AIGuiComponent;
+import com.yohannzhang.aigit.util.CodeUtil;
+import com.yohannzhang.aigit.util.IdeaDialogUtil;
 import org.jetbrains.annotations.NotNull;
 
 public class AskAnythingAction extends AnAction {
@@ -50,7 +48,8 @@ public class AskAnythingAction extends AnAction {
         ToolWindow toolWindow = ToolWindowManager.getInstance(project).getToolWindow(RESULT_BOX_TOOL_WINDOW);
         if (toolWindow == null) return;
 
-        toolWindow.show(() -> {});
+        toolWindow.show(() -> {
+        });
         processSelectedText(project, selectedText);
     }
 

@@ -1,8 +1,5 @@
 package com.yohannzhang.aigit.config;
 
-import com.yohannzhang.aigit.constant.Constants;
-import com.yohannzhang.aigit.service.AIService;
-import com.yohannzhang.aigit.service.CommitMessageService;
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.progress.ProgressIndicator;
@@ -13,6 +10,9 @@ import com.intellij.openapi.ui.Messages;
 import com.intellij.ui.JBColor;
 import com.intellij.ui.components.JBPasswordField;
 import com.intellij.util.ui.JBUI;
+import com.yohannzhang.aigit.constant.Constants;
+import com.yohannzhang.aigit.service.AIService;
+import com.yohannzhang.aigit.service.CommitMessageService;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;

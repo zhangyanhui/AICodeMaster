@@ -21,5 +21,6 @@ public class AIGuiComponent implements ProjectComponent {
 
     public static AIGuiComponent getInstance(Project project) {
 
-        return project.getService(AIGuiComponent.class);    }
+        return project.getService(AIGuiComponent.class);
+    }
 }

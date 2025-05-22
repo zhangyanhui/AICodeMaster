@@ -1,8 +1,8 @@
 package com.yohannzhang.aigit.util;
 
-import com.yohannzhang.aigit.constant.Constants;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
+import com.yohannzhang.aigit.constant.Constants;
 
 import java.io.BufferedReader;
 import java.io.File;

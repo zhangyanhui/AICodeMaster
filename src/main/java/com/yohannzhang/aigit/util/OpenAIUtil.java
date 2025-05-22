@@ -1,5 +1,12 @@
 package com.yohannzhang.aigit.util;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yohannzhang.aigit.config.ApiKeySettings;
+import com.yohannzhang.aigit.pojo.OpenAIRequestBO;
+import org.apache.commons.lang3.StringUtils;
+import org.jetbrains.annotations.NotNull;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -10,14 +17,6 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.function.Consumer;
-
-import org.apache.commons.lang3.StringUtils;
-import org.jetbrains.annotations.NotNull;
-
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.yohannzhang.aigit.config.ApiKeySettings;
-import com.yohannzhang.aigit.pojo.OpenAIRequestBO;
 
 public class OpenAIUtil {
 
@@ -113,7 +112,6 @@ public class OpenAIUtil {
             }
         }).start();
     }
-
 
 
     private static String getCharsetFromContentType(String contentType) {

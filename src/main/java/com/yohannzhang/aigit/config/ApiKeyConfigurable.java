@@ -1,19 +1,17 @@
 package com.yohannzhang.aigit.config;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import javax.swing.JComponent;
-import javax.swing.table.DefaultTableModel;
-
+import com.intellij.openapi.options.Configurable;
+import com.yohannzhang.aigit.constant.Constants;
+import com.yohannzhang.aigit.pojo.PromptInfo;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.yohannzhang.aigit.constant.Constants;
-import com.yohannzhang.aigit.pojo.PromptInfo;
-import com.intellij.openapi.options.Configurable;
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import java.util.ArrayList;
+import java.util.List;
 
 public class ApiKeyConfigurable implements Configurable {
 
@@ -26,6 +24,7 @@ public class ApiKeyConfigurable implements Configurable {
     public String getDisplayName() {
         return "AI Code Master";
     }
+
     //获取当前ui
     public ApiKeyConfigurableUI getUi() {
         return ui;
@@ -53,12 +52,12 @@ public class ApiKeyConfigurable implements Configurable {
         if (ui == null) {
             return;  // 如果UI已经被销毁，直接返回
         }
-        
+
         // 保存当前设置到临时变量
         String selectedClient = (String) ui.getClientComboBox().getSelectedItem();
         String selectedModule = (String) ui.getModuleComboBox().getSelectedItem();
         String commitLanguage = (String) ui.getLanguageComboBox().getSelectedItem();
-        
+
         // 应用设置
         settings.setSelectedClient(selectedClient);
         settings.setSelectedModule(selectedModule);
@@ -104,7 +103,7 @@ public class ApiKeyConfigurable implements Configurable {
         model.setRowCount(0);
         for (PromptInfo prompt : settings.getCustomPrompts()) {
             if (prompt != null) {
-                model.addRow(new String[] { prompt.getDescription(), prompt.getPrompt() });
+                model.addRow(new String[]{prompt.getDescription(), prompt.getPrompt()});
             }
         }
     }

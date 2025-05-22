@@ -43,7 +43,7 @@ public class OllamaService implements AIService {
     }
 
     @Override
-    public void generateCommitMessageStream(String content, Consumer<String> onNext ,Consumer<Throwable> onError, Runnable onComplete) throws Exception {
+    public void generateCommitMessageStream(String content, Consumer<String> onNext, Consumer<Throwable> onError, Runnable onComplete) throws Exception {
         getAIResponseStream(content, onNext);
     }
 

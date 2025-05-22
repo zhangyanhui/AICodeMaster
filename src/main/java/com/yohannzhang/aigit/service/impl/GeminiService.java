@@ -161,7 +161,7 @@ public class GeminiService implements AIService {
         return connection;
     }
 
-    private void getAIResponseStream(String textContent, Consumer<String> onNext) throws Exception{
+    private void getAIResponseStream(String textContent, Consumer<String> onNext) throws Exception {
         ApiKeySettings settings = ApiKeySettings.getInstance();
         String selectedModule = settings.getSelectedModule();
         ApiKeySettings.ModuleConfig moduleConfig = settings.getModuleConfigs().get(Constants.Gemini);

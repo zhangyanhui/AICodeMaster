@@ -1,13 +1,6 @@
 package com.yohannzhang.aigit.action;
 
 
-import com.intellij.openapi.fileTypes.StdFileTypes;
-import com.yohannzhang.aigit.ui.AIGuiComponent;
-import com.yohannzhang.aigit.ui.CombinedWindowFactory;
-import com.yohannzhang.aigit.constant.Constants;
-import com.yohannzhang.aigit.service.CodeService;
-import com.yohannzhang.aigit.util.CodeUtil;
-import com.yohannzhang.aigit.util.IdeaDialogUtil;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.application.ApplicationManager;
@@ -19,6 +12,11 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.openapi.wm.ToolWindowManager;
+import com.yohannzhang.aigit.constant.Constants;
+import com.yohannzhang.aigit.service.CodeService;
+import com.yohannzhang.aigit.ui.AIGuiComponent;
+import com.yohannzhang.aigit.util.CodeUtil;
+import com.yohannzhang.aigit.util.IdeaDialogUtil;
 import org.jetbrains.annotations.NotNull;
 
 import static com.intellij.openapi.diff.impl.patch.formove.PatchApplier.showError;
@@ -55,7 +53,7 @@ public class ShowMeYourCodeAction extends AnAction {
                 toolWindow.show(() -> {
                 });
                 // 根据配置，创建对应的服务
-                CodeService codeService =  new CodeService();
+                CodeService codeService = new CodeService();
                 String code = ShowMeYourCodeAction.codeUtil.formatCode(selectedText);
                 String prompt = "你是一个Java代码开发专家，请根据给定的文字描述，用中文生成相应的代码及注释，格式分三部分：1.文字描述 2.代码及注释，对应注释在代码上方 3.总结。文字如下：" + code;
                 // Run the time-consuming operations in a background task
@@ -95,6 +93,7 @@ public class ShowMeYourCodeAction extends AnAction {
                             IdeaDialogUtil.showError(project, "Error generating commit message: " + ex.getMessage(), "Error");
                         }
                     }
+
                     private void handleTokenResponse(String token) {
                         ApplicationManager.getApplication().invokeLater(() -> {
 //                            messageBuilder.append(token);

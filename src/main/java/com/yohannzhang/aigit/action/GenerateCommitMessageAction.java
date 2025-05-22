@@ -1,9 +1,5 @@
 package com.yohannzhang.aigit.action;
 
-import com.yohannzhang.aigit.constant.Constants;
-import com.yohannzhang.aigit.service.CommitMessageService;
-import com.yohannzhang.aigit.util.GItCommitUtil;
-import com.yohannzhang.aigit.util.IdeaDialogUtil;
 import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
@@ -17,6 +13,10 @@ import com.intellij.openapi.vcs.VcsDataKeys;
 import com.intellij.openapi.vcs.changes.Change;
 import com.intellij.openapi.vcs.ui.CommitMessage;
 import com.intellij.vcs.commit.AbstractCommitWorkflowHandler;
+import com.yohannzhang.aigit.constant.Constants;
+import com.yohannzhang.aigit.service.CommitMessageService;
+import com.yohannzhang.aigit.util.GItCommitUtil;
+import com.yohannzhang.aigit.util.IdeaDialogUtil;
 import git4idea.GitLocalBranch;
 import git4idea.repo.GitRepositoryManager;
 import org.jetbrains.annotations.NotNull;
@@ -76,7 +76,7 @@ public class GenerateCommitMessageAction extends AnAction {
             return;
         }
 
-        commitMessage.setCommitMessage(branch.getName()+":" +Constants.GENERATING_COMMIT_MESSAGE);
+        commitMessage.setCommitMessage(branch.getName() + ":" + Constants.GENERATING_COMMIT_MESSAGE);
         String diff = GItCommitUtil.computeDiff(includedChanges, includedUnversionedFiles, project);
 //
 
@@ -85,7 +85,7 @@ public class GenerateCommitMessageAction extends AnAction {
             @Override
             public void run(@NotNull ProgressIndicator indicator) {
                 try {
-                      System.out.println("diff: " + diff);
+                    System.out.println("diff: " + diff);
                     if (commitMessageService.generateByStream()) {
                         messageBuilder.setLength(0);
                         commitMessageService.generateCommitMessageStream(
@@ -97,7 +97,7 @@ public class GenerateCommitMessageAction extends AnAction {
                                         commitMessage.setCommitMessage(token);
                                     } else {
                                         messageBuilder.append(token);
-                                        commitMessage.setCommitMessage(branch.getName()+":" +messageBuilder.toString());
+                                        commitMessage.setCommitMessage(branch.getName() + ":" + messageBuilder.toString());
                                     }
                                 }),
                                 // onError 处理错误
@@ -108,7 +108,7 @@ public class GenerateCommitMessageAction extends AnAction {
                     } else {
                         String commitMessageFromAi = commitMessageService.generateCommitMessage(diff).trim();
                         ApplicationManager.getApplication().invokeLater(() -> {
-                            commitMessage.setCommitMessage(branch.getName()+":" +commitMessageFromAi);
+                            commitMessage.setCommitMessage(branch.getName() + ":" + commitMessageFromAi);
                         });
                     }
                 } catch (IllegalArgumentException ex) {
@@ -117,7 +117,7 @@ public class GenerateCommitMessageAction extends AnAction {
                 } catch (Exception ex) {
                     IdeaDialogUtil.showError(project, "Error generating commit message: " + ex.getMessage(), "Error");
                 }
-               // update(e);
+                // update(e);
             }
         });
 

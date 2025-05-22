@@ -1,7 +1,8 @@
 # AI Code Plugin for IntelliJ IDEA
 
-
-AI Code Master 是一款集成了 AI 功能的 IntelliJ IDEA 插件，旨在帮助开发者更高效地生成有意义的代码提交信息，解释代码功能，提供优化建议等。插件采用了现代化的界面设计，仿照通义灵码的交互模式，让开发者可以在熟悉的环境中获得 AI 辅助。
+AI Code Master 是一款集成了 AI 功能的 IntelliJ IDEA
+插件，旨在帮助开发者更高效地生成有意义的代码提交信息，解释代码功能，提供优化建议等。插件采用了现代化的界面设计，仿照通义灵码的交互模式，让开发者可以在熟悉的环境中获得
+AI 辅助。
 
 ## 功能特点
 
@@ -72,14 +73,17 @@ feat(auth): 实现完整的用户认证模块
 - 添加了XSS防护措施
 - 实现了会话固定攻击防护
 ```
+
 以下是代码优化的示例
 ![img.png](/images/img_4.png)
 
 ## 贡献与反馈
 
-如果你在使用过程中遇到问题或有改进建议，请提交 issue 到我们的 GitHub 仓库：[https://github.com/zhangyanhui/AICodeMaster.git)
+如果你在使用过程中遇到问题或有改进建议，请提交 issue 到我们的 GitHub
+仓库：[https://github.com/zhangyanhui/AICodeMaster.git)
 
 我们欢迎任何形式的贡献，包括但不限于：
+
 - 提交 bug 报告
 - 提出功能建议
 - 贡献代码
@@ -88,12 +92,15 @@ feat(auth): 实现完整的用户认证模块
 ## 许可证
 
 本项目采用 [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0) 许可证。
+
 ## 联系我们
+
 如果你在使用过程中遇到任何问题，或者有任何建议和意见，欢迎通过以下方式联系我们：
 
 - 邮箱：[yohannzhang@qq.com]
 
 ## 作者的其他项目，欢迎体验
+
 - 公众号：[诗在盛唐]
   ![img.png](/images/img.png)
 - 小程序：[诗在盛唐]
@@ -102,8 +109,10 @@ feat(auth): 实现完整的用户认证模块
   ![img_3.png](/images/img_3.png)
 - 小程序：[模拟手机来电]
   ![img_5.png](/images/img_5.png)
+
 ## 鸣谢
 
 本项目是在以下开源项目上进行的改造，在此表示感谢：
+
 - (https://github.com/HMYDK/AIGitCommit.git)
 
