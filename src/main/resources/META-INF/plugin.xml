@@ -74,9 +74,11 @@
 
     <extensions defaultExtensionNs="com.intellij">
         <projectService serviceImplementation="com.yohannzhang.aigit.ui.AIGuiComponent"/>
-
         <!-- 注册欢迎通知活动 -->
         <postStartupActivity implementation="com.yohannzhang.aigit.action.WelcomeNotification"/>
+        <!-- 注册行标记提供者 -->
+        <!-- <lineMarkerProvider implementation="com.yohannzhang.aigit.gutter.CodeActionGutterIconProvider"/> -->
+        <postStartupActivity implementation="com.yohannzhang.aigit.ui.editor.CodeActionEditorListener"/>
         <!-- 声明通知组 -->
         <notificationGroup id="AI Code Master Notifications" displayType="BALLOON"/>
         <!--        <applicationConfigurable instance="config.com.yohannzhang.aigit.ApiKeyConfigurable"-->
@@ -93,9 +95,14 @@
                     anchor="right"
 
                     factoryClass="com.yohannzhang.aigit.ui.CombinedWindowFactory"/>
+        <completion.contributor
+                language="JAVA"
+                implementationClass="com.yohannzhang.aigit.action.AICodeCompletionContributor"/>
     </extensions>
 
     <actions>
+
+
         <!-- Declare the action for manual commit message generation -->
         <action id="AICommitMessage.Generate"
                 class="com.yohannzhang.aigit.action.GenerateCommitMessageAction"

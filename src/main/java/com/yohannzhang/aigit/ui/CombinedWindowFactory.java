@@ -30,6 +30,8 @@ import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.FocusAdapter;
+import java.awt.event.FocusEvent;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -90,8 +92,13 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
 
     @Override
     public void createToolWindowContent(@NotNull Project project, @NotNull ToolWindow toolWindow) {
+        //打印日志
+        System.out.println("createToolWindowContent");
         // 初始化 IDE 背景色
         initIdeBackgroundColor();
+        //打印字体颜色，背景颜色
+        System.out.println("IDE Font Color: " + toHex(ideFontColor));
+        System.out.println("IDE Background Color: " + toHex(ideBackgroundColor));
         // 创建消息连接并监听主题变化
         messageBusConnection = project.getMessageBus().connect();
         messageBusConnection.subscribe(EditorColorsManager.TOPIC, this);
@@ -99,12 +106,16 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         GridBagConstraints gbc = createDefaultConstraints();
 
         panel.add(createOutputPanel(project), gbc);
+        //解释代码
         gbc.gridy = 1;
-        gbc.weighty = 0.3;
+        gbc.weighty = 0.1;
         panel.add(createInputPanel(project), gbc);
 
         Content content = ContentFactory.getInstance().createContent(panel, "", false);
         toolWindow.getContentManager().addContent(content);
+
+        refreshUIOnThemeChange(); // 刷新 UI 样式
+
     }
 
     private void onThemeChanged(EditorColorsScheme scheme) {
@@ -127,6 +138,8 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         }
         if (outputPanel != null) {
             outputPanel.setBackground(ideBackgroundColor);
+            outputPanel.setForeground(ideFontColor); // 文本颜色可根据需要调整
+
 
         }
 
@@ -170,11 +183,24 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
     private void initIdeBackgroundColor() {
         EditorColorsScheme colorsScheme = EditorColorsManager.getInstance().getGlobalScheme();
         ideBackgroundColor = colorsScheme.getDefaultBackground();
-        ideFontColor = colorsScheme.getDefaultForeground();
         fontSize = colorsScheme.getEditorFontSize2D();
 
-        colorsScheme.getFontPreferences();
+
+        // 计算亮度
+        int rgb = ideBackgroundColor.getRGB();
+        int r = (rgb >> 16) & 0xFF;
+        int g = (rgb >> 8) & 0xFF;
+        int b = rgb & 0xFF;
+        double brightness = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+
+        // 动态调整前景色
+        if (brightness < 0.5) {
+            ideFontColor = Color.WHITE; // 背景较暗时使用白色字体
+        } else {
+            ideFontColor = Color.BLACK; // 背景较亮时使用黑色字体
+        }
     }
+
 
     public void updateResult(String markdownResult) {
         if (markdownViewer == null) return;
@@ -213,8 +239,14 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
 
     private JPanel createOutputPanel(Project project) {
         outputPanel = new JPanel(new BorderLayout(10, 10));
-        outputPanel.setBorder(BorderFactory.createTitledBorder("输出结果"));
+//        outputPanel.setBorder(BorderFactory.createTitledBorder("输出结果"));
         outputPanel.setBackground(ideBackgroundColor);
+        // 如果需要调整输入/输出面板的边框（可选）
+        outputPanel.setBorder(BorderFactory.createTitledBorder(
+                BorderFactory.createLineBorder(new Color(150, 150, 150), 0), // 添加1px边框
+                ""
+        ));
+
 
         markdownViewer = new JBCefBrowser();
         markdownViewer.getComponent().setBorder(BorderFactory.createEmptyBorder());
@@ -224,7 +256,8 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
                 "document.documentElement.style.setProperty('--workspace-color', '" + toHex(ideBackgroundColor) + "');" +
                 "document.documentElement.style.setProperty('--idefont-color', '" + toHex(ideFontColor) + "');";
 
-
+        System.out.println("2IDE Font Color: " + toHex(ideFontColor));
+        System.out.println("2IDE Background Color: " + toHex(ideBackgroundColor));
         // 初始加载空 HTML 页面
         ApplicationManager.getApplication().invokeLater(() -> {
             markdownViewer.loadHTML(EMPTY_HTML);
@@ -244,7 +277,7 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
 
     private JPanel createInputPanel(Project project) {
         JPanel inputPanel = new JPanel(new BorderLayout(10, 10));
-        inputPanel.setBorder(BorderFactory.createTitledBorder("输入问题"));
+//        inputPanel.setBorder(BorderFactory.createTitledBorder("输入问题"));
         inputPanel.setBackground(ideBackgroundColor);
 
         String[] clientArr = ApiKeySettings.getInstance().getAvailableModels();
@@ -278,12 +311,44 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         leftPanel.setBackground(ideBackgroundColor);
         leftPanel.add(modelComboBox);
 
+        // 在createInputPanel方法中，找到questionTextArea初始化部分：
         questionTextArea = new JTextArea(3, 50);
         questionTextArea.setLineWrap(true);
         questionTextArea.setWrapStyleWord(true);
-        questionTextArea.setBackground(ideBackgroundColor); // 输入框背景与 IDE 一致
-        questionTextArea.setForeground(ideFontColor); // 文本颜色可根据需要调整
+        questionTextArea.setBackground(ideBackgroundColor);
+        questionTextArea.setForeground(ideFontColor);
         questionTextArea.requestFocusInWindow();
+
+// 新增以下代码（仅需4行）：
+        String placeholderText = "请输入问题";
+        questionTextArea.setText(placeholderText);
+        questionTextArea.setForeground(ideBackgroundColor.brighter().brighter());
+
+// 添加焦点监听器
+        questionTextArea.addFocusListener(new FocusAdapter() {
+            @Override
+            public void focusGained(FocusEvent e) {
+                if (questionTextArea.getText().equals(placeholderText)) {
+                    questionTextArea.setText("");
+                    questionTextArea.setForeground(ideFontColor);
+                }
+            }
+
+            @Override
+            public void focusLost(FocusEvent e) {
+                if (questionTextArea.getText().isEmpty()) {
+                    questionTextArea.setText(placeholderText);
+                    questionTextArea.setForeground(ideBackgroundColor.brighter().brighter());
+                }
+            }
+        });
+
+        // 调整文本输入框边框（如果需要）
+        questionTextArea.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(100, 100, 100), 0), // 1px边框
+                BorderFactory.createEmptyBorder(5, 8, 5, 8)
+        ));
+
         //显示为可编辑
         questionTextArea.setEditable(true);
 
@@ -331,19 +396,27 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
     private JButton createStyledButton(String text) {
         JButton button = new JButton(text);
         button.setFont(new Font("SansSerif", Font.BOLD, 14));
-        button.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20)); // 增加内边距
+//        button.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20)); // 增加内边距
         button.setOpaque(true);
         button.setForeground(ideFontColor);
         button.setFocusPainted(false);
-        button.setBorderPainted(true); // 启用边框绘制
+//        button.setBorderPainted(true); // 启用边框绘制
         button.setCursor(new Cursor(Cursor.HAND_CURSOR)); // 鼠标悬停时显示手型
+        // 修改按钮边框粗细
+        button.setBorder(BorderFactory.createCompoundBorder(
+                // 将线框厚度从2调整为1
+                BorderFactory.createLineBorder(new Color(22, 93, 255), 0),
+                // 可选：调整内边距（原为10,20,10,20）
+                BorderFactory.createEmptyBorder(5, 15, 5, 15)
+        ));
+
 
         // 设置按钮的 preferredSize
         button.setPreferredSize(new Dimension(80, 30));
 
         // 圆角效果
         button.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(22, 93, 255), 2),
+                BorderFactory.createLineBorder(new Color(22, 93, 255), 1),
                 BorderFactory.createEmptyBorder(10, 20, 10, 20)
         ));
 
@@ -351,18 +424,18 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         button.setBackground(BUTTON_COLOR);
 
         // 鼠标悬停效果
-        button.addMouseListener(new java.awt.event.MouseAdapter() {
-            @Override
-            public void mouseEntered(java.awt.event.MouseEvent e) {
-                button.setBackground(new Color(13, 46, 136));
-            }
-
-            @Override
-            public void mouseExited(java.awt.event.MouseEvent e) {
-                // 设置背景颜色为默认颜色
-                button.setBackground(BUTTON_COLOR);
-            }
-        });
+//        button.addMouseListener(new java.awt.event.MouseAdapter() {
+//            @Override
+//            public void mouseEntered(java.awt.event.MouseEvent e) {
+//                button.setBackground(new Color(13, 46, 136));
+//            }
+//
+//            @Override
+//            public void mouseExited(java.awt.event.MouseEvent e) {
+//                // 设置背景颜色为默认颜色
+//                button.setBackground(BUTTON_COLOR);
+//            }
+//        });
 
         return button;
     }
@@ -432,8 +505,6 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         askButton.setVisible(false);
         cancelButton.setVisible(true);
     }
-
-
 
 
 }
