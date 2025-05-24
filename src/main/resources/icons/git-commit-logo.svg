@@ -2,8 +2,8 @@
     <defs>
         <!-- 修改为红色渐变 -->
         <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="" stop-color="pink"/>
-            <stop offset="100%" stop-color="blue"/>
+            <stop offset="0%" stop-color="#1E6FEB"/>  <!-- 阿里云蓝 -->
+            <stop offset="100%" stop-color="#34A853"/> <!-- Google绿 -->
         </linearGradient>
     </defs>
 

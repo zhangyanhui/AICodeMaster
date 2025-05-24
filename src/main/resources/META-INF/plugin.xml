@@ -67,9 +67,9 @@
 
     <!-- Product and plugin compatibility requirements.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
-    <depends optional="true" config="false">com.intellij.modules.lang</depends>
-    <depends optional="true" config="false">com.intellij.modules.vcs</depends>
-    <depends optional="true" config="false">Git4Idea</depends>
+    <depends optional="true" config-file="lang.xml">com.intellij.modules.lang</depends>
+    <depends optional="true" config-file="vcs.xml">com.intellij.modules.vcs</depends>
+    <depends optional="true" config-file="git4idea.xml">Git4Idea</depends>
 
 
     <extensions defaultExtensionNs="com.intellij">
@@ -93,11 +93,7 @@
         <!-- 注册工具窗口 -->
         <toolWindow id="AICodeMaster" icon="/icons/git-commit-logo.svg"
                     anchor="right"
-
                     factoryClass="com.yohannzhang.aigit.ui.CombinedWindowFactory"/>
-        <completion.contributor
-                language="JAVA"
-                implementationClass="com.yohannzhang.aigit.action.AICodeCompletionContributor"/>
     </extensions>
 
     <actions>

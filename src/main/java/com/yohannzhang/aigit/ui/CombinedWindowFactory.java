@@ -92,29 +92,27 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
 
     @Override
     public void createToolWindowContent(@NotNull Project project, @NotNull ToolWindow toolWindow) {
-        //打印日志
-        System.out.println("createToolWindowContent");
         // 初始化 IDE 背景色
         initIdeBackgroundColor();
-        //打印字体颜色，背景颜色
-        System.out.println("IDE Font Color: " + toHex(ideFontColor));
-        System.out.println("IDE Background Color: " + toHex(ideBackgroundColor));
+        
         // 创建消息连接并监听主题变化
         messageBusConnection = project.getMessageBus().connect();
         messageBusConnection.subscribe(EditorColorsManager.TOPIC, this);
+        
         JPanel panel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = createDefaultConstraints();
 
         panel.add(createOutputPanel(project), gbc);
-        //解释代码
         gbc.gridy = 1;
         gbc.weighty = 0.1;
         panel.add(createInputPanel(project), gbc);
 
-        Content content = ContentFactory.getInstance().createContent(panel, "", false);
+        Content content = toolWindow.getContentManager().getFactory().createContent(panel, "", false);
         toolWindow.getContentManager().addContent(content);
 
-        refreshUIOnThemeChange(); // 刷新 UI 样式
+        // 确保在创建完所有组件后刷新UI
+        ApplicationManager.getApplication().invokeLater(this::refreshUIOnThemeChange);
+        AIGuiComponent.getInstance(project).setWindowFactory(this);
 
     }
 
@@ -131,60 +129,66 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
     }
 
     private void refreshUIOnThemeChange() {
-        // 1. 刷新输入面板背景色
         if (questionTextArea != null) {
-            questionTextArea.setBackground(ideBackgroundColor); // 输入框背景与 IDE 一致
-            questionTextArea.setForeground(ideFontColor); // 文本颜色可根据需要调整
+            questionTextArea.setBackground(ideBackgroundColor);
+            questionTextArea.setForeground(ideFontColor);
         }
         if (outputPanel != null) {
             outputPanel.setBackground(ideBackgroundColor);
-            outputPanel.setForeground(ideFontColor); // 文本颜色可根据需要调整
-
-
+            outputPanel.setForeground(ideFontColor);
         }
-
-        // 2. 刷新按钮样式
         if (askButton != null && cancelButton != null) {
             askButton.setBackground(BUTTON_COLOR);
             askButton.setForeground(ideFontColor);
             cancelButton.setBackground(BUTTON_COLOR);
             cancelButton.setForeground(ideFontColor);
-
-
         }
-
-        // 3. 刷新下拉框背景
         if (modelComboBox != null) {
             modelComboBox.setBackground(ideBackgroundColor);
             modelComboBox.setForeground(ideFontColor);
         }
 
-        // 4. 刷新整个面板背景色
+        // 刷新所有面板的背景色
         Component[] components = questionTextArea.getParent().getComponents();
         for (Component comp : components) {
             if (comp instanceof JPanel) {
                 comp.setBackground(ideBackgroundColor);
+                // 递归刷新子组件
+                refreshComponentBackground(comp);
             }
         }
 
+        // 更新 Markdown 查看器的主题
         String script = "document.documentElement.style.setProperty('--font-size', '" + fontSize + "px');" +
                 "document.documentElement.style.setProperty('--workspace-color', '" + toHex(ideBackgroundColor) + "');" +
                 "document.documentElement.style.setProperty('--idefont-color', '" + toHex(ideFontColor) + "');";
 
+        if (markdownViewer != null) {
+            ApplicationManager.getApplication().invokeLater(() -> {
+                markdownViewer.getCefBrowser().executeJavaScript(script, "about:blank", 0);
+            });
+        }
+    }
 
-        // 初始加载空 HTML 页面
-        ApplicationManager.getApplication().invokeLater(() -> {
-
-            markdownViewer.getCefBrowser().executeJavaScript(script, "about:blank", 0);
-
-        });
+    private void refreshComponentBackground(Component component) {
+        if (component == null) return;
+        
+        component.setBackground(ideBackgroundColor);
+        if (component instanceof JComboBox) {
+            component.setForeground(ideFontColor);
+        }
+        
+        if (component instanceof Container) {
+            for (Component child : ((Container) component).getComponents()) {
+                refreshComponentBackground(child);
+            }
+        }
     }
 
     private void initIdeBackgroundColor() {
         EditorColorsScheme colorsScheme = EditorColorsManager.getInstance().getGlobalScheme();
         ideBackgroundColor = colorsScheme.getDefaultBackground();
         fontSize = colorsScheme.getEditorFontSize2D();
-
 
         // 计算亮度
         int rgb = ideBackgroundColor.getRGB();
@@ -195,9 +199,9 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
 
         // 动态调整前景色
         if (brightness < 0.5) {
-            ideFontColor = Color.WHITE; // 背景较暗时使用白色字体
+            ideFontColor = Color.WHITE;
         } else {
-            ideFontColor = Color.BLACK; // 背景较亮时使用黑色字体
+            ideFontColor = Color.BLACK;
         }
     }
 
@@ -277,7 +281,6 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
 
     private JPanel createInputPanel(Project project) {
         JPanel inputPanel = new JPanel(new BorderLayout(10, 10));
-//        inputPanel.setBorder(BorderFactory.createTitledBorder("输入问题"));
         inputPanel.setBackground(ideBackgroundColor);
 
         String[] clientArr = ApiKeySettings.getInstance().getAvailableModels();
@@ -289,68 +292,11 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         modelComboBox.setBackground(ideBackgroundColor);
         modelComboBox.setForeground(ideFontColor);
         modelComboBox.setFont(new Font("SansSerif", Font.PLAIN, 12));
-        //切换模型时处理逻辑，同步设置ApiKeySettings
-        // 添加模型切换事件监听器
-        modelComboBox.addActionListener(e -> {
-            // 更新 ApiKeyConfigurableUI 中的模型选择
-            ApiKeyConfigurableUI ui = new ApiKeyConfigurableUI();
-            String selectedClient = (String) modelComboBox.getSelectedItem();
-            ApiKeySettings.getInstance().setSelectedClient(selectedClient);
-
-            ui.updateModuleComboBox(selectedClient);
-            String[] modleArr = Constants.CLIENT_MODULES.get(selectedClient);
-            if (modleArr != null) {
-                ui.updateModuleComboBox(modleArr[0]);
-                ApiKeySettings.getInstance().setSelectedModule(modleArr[0]);
-            }
-
-        });
-
+        
         // 使用 JPanel 包裹下拉框，便于布局控制
         JPanel leftPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         leftPanel.setBackground(ideBackgroundColor);
         leftPanel.add(modelComboBox);
-
-        // 在createInputPanel方法中，找到questionTextArea初始化部分：
-        questionTextArea = new JTextArea(3, 50);
-        questionTextArea.setLineWrap(true);
-        questionTextArea.setWrapStyleWord(true);
-        questionTextArea.setBackground(ideBackgroundColor);
-        questionTextArea.setForeground(ideFontColor);
-        questionTextArea.requestFocusInWindow();
-
-// 新增以下代码（仅需4行）：
-        String placeholderText = "请输入问题";
-        questionTextArea.setText(placeholderText);
-        questionTextArea.setForeground(ideBackgroundColor.brighter().brighter());
-
-// 添加焦点监听器
-        questionTextArea.addFocusListener(new FocusAdapter() {
-            @Override
-            public void focusGained(FocusEvent e) {
-                if (questionTextArea.getText().equals(placeholderText)) {
-                    questionTextArea.setText("");
-                    questionTextArea.setForeground(ideFontColor);
-                }
-            }
-
-            @Override
-            public void focusLost(FocusEvent e) {
-                if (questionTextArea.getText().isEmpty()) {
-                    questionTextArea.setText(placeholderText);
-                    questionTextArea.setForeground(ideBackgroundColor.brighter().brighter());
-                }
-            }
-        });
-
-        // 调整文本输入框边框（如果需要）
-        questionTextArea.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(100, 100, 100), 0), // 1px边框
-                BorderFactory.createEmptyBorder(5, 8, 5, 8)
-        ));
-
-        //显示为可编辑
-        questionTextArea.setEditable(true);
 
         // 创建按钮面板并添加组件
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
@@ -373,11 +319,52 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         topPanel.add(leftPanel, BorderLayout.WEST);
         topPanel.add(buttonPanel, BorderLayout.EAST);
 
-        // 添加所有组件到输入面板
-        inputPanel.add(topPanel, BorderLayout.SOUTH); // 模型选择和按钮在顶部
-        inputPanel.add(new JBScrollPane(questionTextArea), BorderLayout.CENTER); // 输入区域在中间
+        // 在createInputPanel方法中，找到questionTextArea初始化部分：
+        questionTextArea = new JTextArea(3, 50);
+        questionTextArea.setLineWrap(true);
+        questionTextArea.setWrapStyleWord(true);
+        questionTextArea.setBackground(ideBackgroundColor);
+        questionTextArea.setForeground(ideFontColor);
+        questionTextArea.requestFocusInWindow();
 
-        AIGuiComponent.getInstance(project).setWindowFactory(this);
+        String placeholderText = "请输入问题";
+        questionTextArea.setText(placeholderText);
+        questionTextArea.setForeground(ideBackgroundColor.brighter().brighter());
+
+        // 添加焦点监听器
+        questionTextArea.addFocusListener(new FocusAdapter() {
+            @Override
+            public void focusGained(FocusEvent e) {
+                if (questionTextArea.getText().equals(placeholderText)) {
+                    questionTextArea.setText("");
+                    questionTextArea.setForeground(ideFontColor);
+                }
+            }
+
+            @Override
+            public void focusLost(FocusEvent e) {
+                if (questionTextArea.getText().isEmpty()) {
+                    questionTextArea.setText(placeholderText);
+                    questionTextArea.setForeground(ideBackgroundColor.brighter().brighter());
+                }
+            }
+        });
+
+        // 调整文本输入框边框
+        questionTextArea.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(100, 100, 100), 0),
+                BorderFactory.createEmptyBorder(5, 8, 5, 8)
+        ));
+
+        questionTextArea.setEditable(true);
+
+        // 添加所有组件到输入面板
+        inputPanel.add(topPanel, BorderLayout.SOUTH);
+        inputPanel.add(new JBScrollPane(questionTextArea), BorderLayout.CENTER);
+
+        // 确保所有组件都使用正确的主题颜色
+        refreshComponentBackground(inputPanel);
+
 
         return inputPanel;
     }

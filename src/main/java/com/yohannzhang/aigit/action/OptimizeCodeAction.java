@@ -1,5 +1,13 @@
 package com.yohannzhang.aigit.action;
 
+import com.intellij.openapi.fileTypes.StdFileTypes;
+import com.yohannzhang.aigit.ui.AIGuiComponent;
+import com.yohannzhang.aigit.ui.CombinedWindowFactory;
+import com.yohannzhang.aigit.constant.Constants;
+import com.yohannzhang.aigit.service.CodeService;
+import com.yohannzhang.aigit.util.ActionControl;
+import com.yohannzhang.aigit.util.CodeUtil;
+import com.yohannzhang.aigit.util.IdeaDialogUtil;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.application.ApplicationManager;
@@ -11,17 +19,10 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.openapi.wm.ToolWindowManager;
-import com.yohannzhang.aigit.constant.Constants;
-import com.yohannzhang.aigit.service.CodeService;
-import com.yohannzhang.aigit.ui.AIGuiComponent;
-import com.yohannzhang.aigit.util.ActionControl;
-import com.yohannzhang.aigit.util.CodeUtil;
-import com.yohannzhang.aigit.util.IdeaDialogUtil;
 import org.jetbrains.annotations.NotNull;
 
 /**
  * 代码优化处理类
- *
  * @author yohannzhang
  * @date 2025/5/16 13:08
  * @since 1.0.0
