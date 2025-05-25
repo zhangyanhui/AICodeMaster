@@ -89,6 +89,7 @@
                                  groupId="Tools"/>
         <applicationService serviceImplementation="com.yohannzhang.aigit.config.ApiKeySettings"/>
 
+        <applicationService serviceImplementation="com.yohannzhang.aigit.config.ChatHistoryService"/>
 
         <!-- 注册工具窗口 -->
         <toolWindow id="AICodeMaster" icon="/icons/git-commit-logo.svg"
