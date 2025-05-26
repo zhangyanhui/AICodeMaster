@@ -5,7 +5,7 @@
     <name>AI Code Master</name>
 
     <vendor email="yohannzhang@qq.com">yohannzhang</vendor>
-    <version>1.5.2</version>
+    <version>1.5.3</version>
 
     <description>
         <![CDATA[
@@ -127,6 +127,13 @@
                 description="根据问题作出回答">
             <add-to-group group-id="EditorPopupMenu" anchor="first"/>
             <keyboard-shortcut keymap="$default" first-keystroke="alt A"/>
+        </action>
+        <action id="AIGit.GenerateTestClass" 
+                class="com.yohannzhang.aigit.action.GenerateTestClassAction" 
+                text="Generate Test Class" 
+                description="Generate test class for the current class">
+            <add-to-group group-id="GenerateGroup" anchor="first"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl shift T"/>
         </action>
     </actions>
 

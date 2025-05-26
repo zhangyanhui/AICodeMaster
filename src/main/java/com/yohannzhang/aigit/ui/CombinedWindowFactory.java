@@ -49,6 +49,7 @@ import java.io.InputStreamReader;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
+import java.util.HashMap;
 
 public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsListener {
     private MessageBusConnection messageBusConnection; // 用于订阅事件总线
@@ -84,6 +85,8 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
     private DefaultListModel<HistoryItem> historyListModel;
     private boolean isHistoryView = false;
 
+    private static final Map<Project, CombinedWindowFactory> instances = new HashMap<>();
+
     static {
         MutableDataSet options = new MutableDataSet();
         parser = Parser.builder(options).build();
@@ -114,6 +117,9 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
 
     @Override
     public void createToolWindowContent(@NotNull Project project, @NotNull ToolWindow toolWindow) {
+        // 保存实例
+        instances.put(project, this);
+        
         // 初始化 IDE 背景色
         initIdeBackgroundColor();
         
@@ -122,7 +128,6 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         messageBusConnection.subscribe(EditorColorsManager.TOPIC, this);
         
         // Add history icon to tool window
-        //调整icon
         AnAction historyAction = new AnAction("Show Chat History", "Show chat history", AllIcons.Vcs.History) {
             @Override
             public void actionPerformed(@NotNull AnActionEvent e) {
@@ -131,16 +136,6 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         };
 
         toolWindow.setTitleActions(Collections.singletonList(historyAction));
-
-
-//        AnAction homeAction = new AnAction("Home", "Return to home page", AllIcons.Actions.Copy) {
-//            @Override
-//            public void actionPerformed(@NotNull AnActionEvent e) {
-//                showWelcomePage();
-//            }
-//        };
-        toolWindow.setTitleActions(Arrays.asList( historyAction));
-
 
         JPanel panel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = createDefaultConstraints();
@@ -159,14 +154,18 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
                 panel);
 
         // 确保在创建完所有组件后刷新UI
-        ApplicationManager.getApplication().invokeLater(this::refreshUIOnThemeChange);
+        ApplicationManager.getApplication().invokeLater(() -> {
+            refreshUIOnThemeChange();
+            // 确保输入框的初始文本颜色正确
+            if (questionTextArea != null) {
+                questionTextArea.setForeground(new Color(180, 180, 180));
+            }
+        });
         AIGuiComponent.getInstance(project).setWindowFactory(this);
-        // 在createToolWindowContent方法中添加:
-//        loadHistory();
     }
     public void showWelcomePage() {
-        String EMPTY_HTML = readResourceFile("welcome.html");
-        markdownViewer.loadHTML(EMPTY_HTML);
+        String welcomeHtml = readResourceFile("welcome.html");
+        markdownViewer.loadHTML(welcomeHtml);
         isHistoryView = false; // 确保不在历史视图
 
         // 刷新UI确保显示正确
@@ -190,12 +189,22 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
 
     private void refreshUIOnThemeChange() {
         if (questionTextArea != null) {
+            // 只有在不是显示占位符文本时才更新前景色
+            if (!questionTextArea.getText().equals("输入问题，点击提交按钮发送")) {
+                questionTextArea.setForeground(ideFontColor);
+            } else {
+                questionTextArea.setForeground(new Color(180, 180, 180));
+            }
             questionTextArea.setBackground(ideBackgroundColor);
-            questionTextArea.setForeground(ideFontColor);
         }
         if (outputPanel != null) {
             outputPanel.setBackground(ideBackgroundColor);
             outputPanel.setForeground(ideFontColor);
+            // 更新输出面板边框颜色
+            outputPanel.setBorder(BorderFactory.createTitledBorder(
+                    BorderFactory.createLineBorder(new Color(200, 200, 200), 1),
+                    "AI 助手"
+            ));
         }
         if (askButton != null && cancelButton != null) {
             askButton.setBackground(BUTTON_COLOR);
@@ -221,7 +230,14 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         // 更新 Markdown 查看器的主题
         String script = "document.documentElement.style.setProperty('--font-size', '" + fontSize + "px');" +
                 "document.documentElement.style.setProperty('--workspace-color', '" + toHex(ideBackgroundColor) + "');" +
-                "document.documentElement.style.setProperty('--idefont-color', '" + toHex(ideFontColor) + "');";
+                "document.documentElement.style.setProperty('--idefont-color', '" + toHex(ideFontColor) + "');" +
+                "document.body.style.backgroundColor = '" + toHex(ideBackgroundColor) + "';" +
+                "document.getElementById('content').style.color = '" + toHex(ideFontColor) + "';" +
+                "document.querySelectorAll('.feature').forEach(el => el.style.backgroundColor = '" + toHex(ideBackgroundColor) + "');" +
+                "document.querySelectorAll('.feature-title').forEach(el => el.style.color = '" + toHex(ideFontColor) + "');" +
+                "document.querySelectorAll('.feature-desc').forEach(el => el.style.color = '" + toHex(ideFontColor) + "');" +
+                "document.querySelectorAll('.welcome-title').forEach(el => el.style.color = '" + toHex(ideFontColor) + "');" +
+                "document.querySelectorAll('.welcome-subtitle').forEach(el => el.style.color = '" + toHex(ideFontColor) + "');";
 
         if (markdownViewer != null) {
             ApplicationManager.getApplication().invokeLater(() -> {
@@ -257,14 +273,16 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         int b = rgb & 0xFF;
         double brightness = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
 
-        // 动态调整前景色
+        // 动态调整前景色和背景色
         if (brightness < 0.5) {
             ideFontColor = Color.WHITE;
+            // 使用深灰色而不是纯黑色
+            ideBackgroundColor = new Color(43, 43, 43);
         } else {
             ideFontColor = Color.BLACK;
+            ideBackgroundColor = new Color(250, 250, 250);
         }
     }
-
 
     public void updateResult(String markdownResult) {
         if (markdownViewer == null) return;
@@ -290,7 +308,6 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         });
     }
 
-
     private GridBagConstraints createDefaultConstraints() {
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(10, 10, 10, 10);
@@ -312,127 +329,14 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
 
         markdownViewer = new JBCefBrowser();
         markdownViewer.getComponent().setBorder(BorderFactory.createEmptyBorder());
-        String EMPTY_HTML = "<!DOCTYPE html>\n" +
-                "<html>\n" +
-                "<head>\n" +
-                "    <link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/github.min.css'>\n" +
-                "    <script src='https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js'></script>\n" +
-                "    <script src='https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/java.min.js'></script>\n" +
-                "    <script src='https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/xml.min.js'></script>\n" +
-                "    <script src='https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/languages/javascript.min.js'></script>\n" +
-                "    <style>\n" +
-                "        body { margin: 0; padding: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; }\n" +
-                "        #content { color: #666; font-size: 14px; line-height: 1.6; }\n" +
-                "        pre { background-color: #f6f8fa; border-radius: 6px; padding: 16px; }\n" +
-                "        code { font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace; }\n" +
-                "        .welcome-container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }\n" +
-                "        .welcome-header { text-align: center; margin-bottom: 40px; }\n" +
-                "        .welcome-title { color: #2c3e50; font-size: 28px; margin-bottom: 10px; font-weight: 600; }\n" +
-                "        .welcome-subtitle { color: #7f8c8d; font-size: 16px; margin-bottom: 30px; }\n" +
-                "        .feature-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 40px; }\n" +
-                "        .feature-card { background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); transition: transform 0.2s; }\n" +
-                "        .feature-card:hover { transform: translateY(-2px); }\n" +
-                "        .feature-icon { font-size: 24px; margin-bottom: 15px; color: #3498db; }\n" +
-                "        .feature-title { color: #2c3e50; font-size: 18px; font-weight: 500; margin-bottom: 10px; }\n" +
-                "        .feature-desc { color: #7f8c8d; font-size: 14px; line-height: 1.5; }\n" +
-                "        .quick-start { background: #f8f9fa; border-radius: 8px; padding: 20px; margin-top: 30px; }\n" +
-                "        .quick-start-title { color: #2c3e50; font-size: 18px; font-weight: 500; margin-bottom: 15px; }\n" +
-                "        .quick-start-list { list-style: none; padding: 0; margin: 0; }\n" +
-                "        .quick-start-item { display: flex; align-items: center; margin-bottom: 12px; color: #7f8c8d; }\n" +
-                "        .quick-start-item:before { content: '•'; color: #3498db; font-size: 20px; margin-right: 10px; }\n" +
-                "        .welcome-footer { text-align: center; margin-top: 40px; color: #95a5a6; font-size: 13px; }\n" +
-                "        .delete-btn:hover { color: #ff6b6b !important; background-color: rgba(255, 107, 107, 0.1); }\n" +
-                "        .chat-item { position: relative; }\n" +
-                "        .chat-item:hover .delete-btn { opacity: 1; }\n" +
-                "        .delete-btn { opacity: 0; transition: opacity 0.2s, color 0.2s, background-color 0.2s; }\n" +
-                "    </style>\n" +
-                "</head>\n" +
-                "<body>\n" +
-                "    <div id='content'>\n" +
-                "        <div class='welcome-container'>\n" +
-                "            <div class='welcome-header'>\n" +
-                "                <div class='welcome-title'>AI 代码助手</div>\n" +
-                "                <div class='welcome-subtitle'>您的智能编程伙伴</div>\n" +
-                "            </div>\n" +
-                "            <div class='feature-grid'>\n" +
-                "                <div class='feature-card'>\n" +
-                "                    <div class='feature-icon'>💡</div>\n" +
-                "                    <div class='feature-title'>智能代码优化</div>\n" +
-                "                    <div class='feature-desc'>自动分析代码质量，提供优化建议，提升代码性能和可维护性</div>\n" +
-                "                </div>\n" +
-                "                <div class='feature-card'>\n" +
-                "                    <div class='feature-icon'>🔍</div>\n" +
-                "                    <div class='feature-title'>问题诊断</div>\n" +
-                "                    <div class='feature-desc'>快速定位代码问题，提供详细的错误分析和解决方案</div>\n" +
-                "                </div>\n" +
-                "                <div class='feature-card'>\n" +
-                "                    <div class='feature-icon'>🔄</div>\n" +
-                "                    <div class='feature-title'>代码重构</div>\n" +
-                "                    <div class='feature-desc'>提供专业的重构建议，帮助改进代码结构和设计模式</div>\n" +
-                "                </div>\n" +
-                "                <div class='feature-card'>\n" +
-                "                    <div class='feature-icon'>💬</div>\n" +
-                "                    <div class='feature-title'>智能问答</div>\n" +
-                "                    <div class='feature-desc'>解答编程问题，提供代码示例，支持多语言开发</div>\n" +
-                "                </div>\n" +
-                "            </div>\n" +
-                "            <div class='quick-start'>\n" +
-                "                <div class='quick-start-title'>快速开始</div>\n" +
-                "                <ul class='quick-start-list'>\n" +
-                "                    <li class='quick-start-item'>在输入框中输入您的问题或需求</li>\n" +
-                "                    <li class='quick-start-item'>选择合适的大语言模型</li>\n" +
-                "                    <li class='quick-start-item'>点击提交按钮或按回车发送</li>\n" +
-                "                    <li class='quick-start-item'>查看 AI 助手的回答和建议</li>\n" +
-                "                </ul>\n" +
-                "            </div>\n" +
-                "            <div class='welcome-footer'>\n" +
-                "                开始您的智能编程之旅吧\n" +
-                "            </div>\n" +
-                "        </div>\n" +
-                "    </div>\n" +
-                "    <script>\n" +
-                "        function addCopyButtons() {\n" +
-                "            document.querySelectorAll('pre code').forEach((block) => {\n" +
-                "                const button = document.createElement('button');\n" +
-                "                button.className = 'copy-button';\n" +
-                "                button.textContent = '复制';\n" +
-                "                button.style.cssText = 'position: absolute; top: 5px; right: 5px; padding: 5px 10px; background: #e1e4e8; border: none; border-radius: 3px; cursor: pointer;';\n" +
-                "                block.parentNode.style.position = 'relative';\n" +
-                "                block.parentNode.appendChild(button);\n" +
-                "                button.addEventListener('click', () => {\n" +
-                "                    navigator.clipboard.writeText(block.textContent);\n" +
-                "                    button.textContent = '已复制';\n" +
-                "                    setTimeout(() => button.textContent = '复制', 2000);\n" +
-                "                });\n" +
-                "            });\n" +
-                "        }\n" +
-                "        function deleteQuestion(btn) {\n" +
-                "            const questionDiv = btn.closest('.question-item');\n" +
-                "            const nextHr = questionDiv.nextElementSibling;\n" +
-                "            const answerDiv = nextHr ? nextHr.nextElementSibling : null;\n" +
-                "            const nextHr2 = answerDiv ? answerDiv.nextElementSibling : null;\n" +
-                "            \n" +
-                "            // 删除问题和答案以及分隔线\n" +
-                "            if (questionDiv) questionDiv.remove();\n" +
-                "            if (nextHr) nextHr.remove();\n" +
-                "            if (answerDiv) answerDiv.remove();\n" +
-                "            if (nextHr2) nextHr2.remove();\n" +
-                "            \n" +
-                "            // 如果删除后没有内容了，显示欢迎页面\n" +
-                "            if (document.querySelectorAll('.chat-item').length === 0) {\n" +
-                "                document.getElementById('content').innerHTML = document.querySelector('.welcome-container').outerHTML;\n" +
-                "            }\n" +
-                "        }\n" +
-                "    </script>\n" +
-                "</body>\n" +
-                "</html>";
-
+        
+        String welcomeHtml = readResourceFile("welcome.html");
         String script = "document.documentElement.style.setProperty('--font-size', '" + fontSize + "px');" +
                 "document.documentElement.style.setProperty('--workspace-color', '" + toHex(ideBackgroundColor) + "');" +
                 "document.documentElement.style.setProperty('--idefont-color', '" + toHex(ideFontColor) + "');";
 
         ApplicationManager.getApplication().invokeLater(() -> {
-            markdownViewer.loadHTML(EMPTY_HTML);
+            markdownViewer.loadHTML(welcomeHtml);
             markdownViewer.getCefBrowser().executeJavaScript(script, "about:blank", 0);
         });
 
@@ -657,12 +561,11 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         questionTextArea.setLineWrap(true);
         questionTextArea.setWrapStyleWord(true);
         questionTextArea.setBackground(ideBackgroundColor);
-        questionTextArea.setForeground(ideFontColor);
+        questionTextArea.setForeground(new Color(180, 180, 180)); // 设置初始文本颜色为浅灰色
         questionTextArea.requestFocusInWindow();
 
-        String placeholderText = "输入问题，按回车发送";
+        String placeholderText = "输入问题，点击提交按钮发送";
         questionTextArea.setText(placeholderText);
-        questionTextArea.setForeground(new Color(128, 128, 128)); // 使用灰色显示占位符
 
         // 添加焦点监听器
         questionTextArea.addFocusListener(new FocusAdapter() {
@@ -678,7 +581,7 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
             public void focusLost(FocusEvent e) {
                 if (questionTextArea.getText().isEmpty()) {
                     questionTextArea.setText(placeholderText);
-                    questionTextArea.setForeground(new Color(128, 128, 128));
+                    questionTextArea.setForeground(new Color(180, 180, 180));
                 }
             }
         });
@@ -775,7 +678,7 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
 
     private void handleAskButtonClick(Project project) {
         String question = questionTextArea.getText().trim();
-        if (question.isEmpty() || question.equals("输入问题，按回车发送")) {
+        if (question.isEmpty() || question.equals("输入问题，点击提交按钮发送")) {
             String errorMessage = "<div style='color: #ff6b6b; padding: 10px; background-color: rgba(255, 107, 107, 0.1); border-radius: 4px;'>请输入问题内容</div>";
             updateResult(errorMessage);
             return;
@@ -918,5 +821,9 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         ChatHistoryService service = ChatHistoryService.getInstance();
         // 只保存问答对，不保存原始Map字符串
         service.addChatRecord(question, answer);
+    }
+
+    public static CombinedWindowFactory getInstance(Project project) {
+        return instances.get(project);
     }
 }
