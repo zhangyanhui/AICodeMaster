@@ -2,14 +2,14 @@ package com.yohannzhang.aigit.action;
 
 import com.intellij.ide.plugins.PluginManagerCore;
 import com.intellij.ide.util.PropertiesComponent;
-import com.intellij.notification.NotificationGroupManager;
+import com.intellij.notification.NotificationGroup;
 import com.intellij.notification.NotificationType;
 import com.intellij.openapi.extensions.PluginId;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.startup.StartupActivity;
 import org.jetbrains.annotations.NotNull;
 
-public class WelcomeNotification implements StartupActivity { // 更改为 StartupActivity
+public class WelcomeNotification implements StartupActivity {
 
     private static final String NOTIFICATION_GROUP_ID = "AI Code Master Notifications";
     private static final String PLUGIN_NAME = "AI Code Master";
@@ -19,6 +19,7 @@ public class WelcomeNotification implements StartupActivity { // 更改为 Start
             "感谢安装 AI Code Master，请在设置中配置插件以开始使用。";
 
     private static final String PLUGIN_VERSION_PROPERTY = "com.hmydk.aigit.version";
+    private static final NotificationGroup NOTIFICATION_GROUP = NotificationGroup.balloonGroup(NOTIFICATION_GROUP_ID);
 
     @Override
     public void runActivity(@NotNull Project project) {
@@ -43,10 +44,8 @@ public class WelcomeNotification implements StartupActivity { // 更改为 Start
     }
 
     private void showWelcomeNotification(@NotNull Project project) {
-        NotificationGroupManager.getInstance()
-                .getNotificationGroup(NOTIFICATION_GROUP_ID)
-                .createNotification(WELCOME_TITLE, WELCOME_CONTENT, NotificationType.INFORMATION)
-                .setIcon(null) // You can set a custom icon here if you have one
+        NOTIFICATION_GROUP.createNotification(WELCOME_TITLE, WELCOME_CONTENT, NotificationType.INFORMATION, null)
+                .setIcon(null)
                 .addAction(new ConfigureAction())
                 .notify(project);
     }

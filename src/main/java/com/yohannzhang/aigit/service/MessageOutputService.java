@@ -1,12 +1,12 @@
 package com.yohannzhang.aigit.service;
 
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.ui.jcef.JBCefBrowser;
 import com.vladsch.flexmark.html.HtmlRenderer;
 import com.vladsch.flexmark.parser.Parser;
 import com.vladsch.flexmark.util.data.MutableDataSet;
 import org.jetbrains.annotations.NotNull;
 
+import javax.swing.*;
 import java.awt.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -14,7 +14,7 @@ import java.time.format.DateTimeFormatter;
 public class MessageOutputService {
     private static final Parser parser;
     private static final HtmlRenderer renderer;
-    private final JBCefBrowser browser;
+    private final JEditorPane editorPane;
     private final Color backgroundColor;
     private final Color fontColor;
     private final float fontSize;
@@ -25,34 +25,36 @@ public class MessageOutputService {
         renderer = HtmlRenderer.builder(options).build();
     }
 
-    public MessageOutputService(JBCefBrowser browser, Color backgroundColor, Color fontColor, float fontSize) {
-        this.browser = browser;
+    public MessageOutputService(JEditorPane editorPane, Color backgroundColor, Color fontColor, float fontSize) {
+        this.editorPane = editorPane;
         this.backgroundColor = backgroundColor;
         this.fontColor = fontColor;
         this.fontSize = fontSize;
     }
 
     public void updateResult(String markdownResult) {
-        if (browser == null) return;
+        if (editorPane == null) return;
 
         // 解析 Markdown 到 HTML
         com.vladsch.flexmark.util.ast.Document document = parser.parse(markdownResult);
         String htmlBody = renderer.render(document);
 
-        // 转义反引号防止 JS 注入问题
-        String safeHtml = htmlBody.replace("`", "\\`");
-
-        // 使用 JS 更新内容并触发高亮和滚动
-        String script = String.format(
-                "document.getElementById('content').innerHTML = `%s`; " +
-                "document.querySelectorAll('pre code').forEach((block) => { hljs.highlightElement(block); }); " +
-                "addCopyButtons(); " +
-                "window.scrollTo(0, document.body.scrollHeight);",
-                safeHtml
+        // 添加基本样式
+        String styledHtml = String.format(
+            "<html><head><style>" +
+            "body { background-color: %s; color: %s; font-size: %s; }" +
+            "pre { background-color: #f5f5f5; padding: 10px; border-radius: 4px; }" +
+            "code { font-family: monospace; }" +
+            "</style></head><body>%s</body></html>",
+            toHex(backgroundColor),
+            toHex(fontColor),
+            fontSize + "px",
+            htmlBody
         );
 
         ApplicationManager.getApplication().invokeLater(() -> {
-            browser.getCefBrowser().executeJavaScript(script, "about:blank", 0);
+            editorPane.setText(styledHtml);
+            editorPane.setCaretPosition(0);
         });
     }
 
@@ -65,18 +67,19 @@ public class MessageOutputService {
     }
 
     public void showWelcomePage(String welcomeHtml) {
-        String script = String.format(
-            "document.documentElement.style.setProperty('--font-size', '%s');" +
-            "document.documentElement.style.setProperty('--workspace-color', '%s');" +
-            "document.documentElement.style.setProperty('--idefont-color', '%s');",
-            fontSize + "px",
+        String styledHtml = String.format(
+            "<html><head><style>" +
+            "body { background-color: %s; color: %s; font-size: %s; }" +
+            "</style></head><body>%s</body></html>",
             toHex(backgroundColor),
-            toHex(fontColor)
+            toHex(fontColor),
+            fontSize + "px",
+            welcomeHtml
         );
 
         ApplicationManager.getApplication().invokeLater(() -> {
-            browser.loadHTML(welcomeHtml);
-            browser.getCefBrowser().executeJavaScript(script, "about:blank", 0);
+            editorPane.setText(styledHtml);
+            editorPane.setCaretPosition(0);
         });
     }
 
@@ -88,7 +91,6 @@ public class MessageOutputService {
             "<strong style='color: #4CAF50;'>Q:</strong>" +
             "<div style='display: flex; align-items: center; gap: 10px;'>" +
             "<span style='color: #666; font-size: 0.9em;'>%s</span>" +
-            "<button class='delete-btn' style='background: none; border: none; color: #999; cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 3px; transition: all 0.2s;' onclick='deleteQuestion(this)'>×</button>" +
             "</div>" +
             "</div>" +
             "<div style='margin-left: 20px;'>%s</div>" +

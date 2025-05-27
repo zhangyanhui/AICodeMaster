@@ -42,7 +42,7 @@ public class Constants {
             put(Gemini, new String[]{"gemini-2.0-flash-exp", "gemini-1.5-flash-latest", "gemini-1.5-flash", "gemini-1.5-pro"});
             put(DeepSeek, new String[]{"deepseek-chat"});
             put(OpenAI_API, new String[]{""});
-            put(Ollama, new String[]{"qwen2.5:14b", "llama3.2:3b"});
+            put(Ollama, new String[]{"qwen3:30b-a3b", "deepseek-r1:32b","qwen3:32b","glm4:latest"});
             put(CloudflareWorkersAI,
                     new String[]{"@cf/meta/llama-3.1-70b-instruct", "@cf/meta/llama-3.1-8b-instruct"});
             put(阿里云百炼, new String[]{"qwen-plus"});
@@ -54,7 +54,7 @@ public class Constants {
         {
             put(Gemini, new ApiKeySettings.ModuleConfig("https://generativelanguage.googleapis.com/v1beta/models", ""));
             put(DeepSeek, new ApiKeySettings.ModuleConfig("https://api.deepseek.com/chat/completions", ""));
-            put(Ollama, new ApiKeySettings.ModuleConfig("http://localhost:11434/api/generate", ""));
+            put(Ollama, new ApiKeySettings.ModuleConfig("http://10.162.1.157:11434/api/generate", "123"));
             put(OpenAI_API, new ApiKeySettings.ModuleConfig("https://{host}/v1/chat/completions", ""));
             put(阿里云百炼, new ApiKeySettings.ModuleConfig("https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", ""));
             put(SiliconFlow, new ApiKeySettings.ModuleConfig("https://api.siliconflow.cn/v1/chat/completions", ""));
@@ -75,31 +75,43 @@ public class Constants {
     };
 
     public static String getHelpText(String client) {
-        return switch (client) {
-            case Gemini ->
-                    "<html>Get your API key from <a href='https://aistudio.google.com/app/apikey'>Google AI Studio</a></html>";
-            case DeepSeek -> "<html>" +
-                    "<li>Get your API key from <a href='https://platform.deepseek.com/api_keys'>platform.deepseek.com</a></li>" +
-                    "<li>Current model is deepseek-v3.</li>" +
-                    "</html>";
-            case Ollama ->
-                    "<html><li>Make sure Ollama is running locally on the specified URL</li><li>API Key is not required</li></html>";
-            case OpenAI_API -> "<html>" +
-                    "<li>Please confirm whether the current model supports the OpenAI API format.</li>"
-                    +
-                    "<li>Replace {host} with the host defined in the model.</li>" +
-                    "<li>Refer to the API definition on the <a href='https://platform.openai.com/docs/overview'>OpenAI Platform</a>.</li>" +
-                    "</html>";
-            case CloudflareWorkersAI -> "<html>" +
-                    "<li>Please refer to the <a href='https://developers.cloudflare.com/workers-ai/get-started/rest-api'>official documentation</a> for details</li>"
-                    +
-                    "<li>Replace {account_id} with your Cloudflare account ID</li>" +
-                    "</html>";
-            case 阿里云百炼 ->
-                    "<html>Get your API key from <a href='https://help.aliyun.com/zh/model-studio/developer-reference/get-api-key?spm=0.0.0.i7'>" + 阿里云百炼 + "</a></html>";
-            case SiliconFlow ->
-                    "<html>Get your API key from <a href='https://cloud.siliconflow.cn/i/lszKPlCW'>" + SiliconFlow + "</a></html>";
-            default -> "";
-        };
+        String result;
+        switch (client) {
+            case Gemini:
+                result = "<html>Get your API key from <a href='https://aistudio.google.com/app/apikey'>Google AI Studio</a></html>";
+                break;
+            case DeepSeek:
+                result = "<html>" +
+                        "<li>Get your API key from <a href='https://platform.deepseek.com/api_keys'>platform.deepseek.com</a></li>" +
+                        "<li>Current model is deepseek-v3.</li>" +
+                        "</html>";
+                break;
+            case Ollama:
+                result = "<html><li>Make sure Ollama is running locally on the specified URL</li><li>API Key is not required</li></html>";
+                break;
+            case OpenAI_API:
+                result = "<html>" +
+                        "<li>Please confirm whether the current model supports the OpenAI API format.</li>" +
+                        "<li>Replace {host} with the host defined in the model.</li>" +
+                        "<li>Refer to the API definition on the <a href='https://platform.openai.com/docs/overview'>OpenAI Platform</a>.</li>" +
+                        "</html>";
+                break;
+            case CloudflareWorkersAI:
+                result = "<html>" +
+                        "<li>Please refer to the <a href='https://developers.cloudflare.com/workers-ai/get-started/rest-api'>official documentation</a> for details</li>" +
+                        "<li>Replace {account_id} with your Cloudflare account ID</li>" +
+                        "</html>";
+                break;
+            case 阿里云百炼:
+                result = "<html>Get your API key from <a href='https://help.aliyun.com/zh/model-studio/developer-reference/get-api-key?spm=0.0.0.i7'>" + 阿里云百炼 + "</a></html>";
+                break;
+            case SiliconFlow:
+                result = "<html>Get your API key from <a href='https://cloud.siliconflow.cn/i/lszKPlCW'>" + SiliconFlow + "</a></html>";
+                break;
+            default:
+                result = "";
+                break;
+        }
+        return result;
     }
 }

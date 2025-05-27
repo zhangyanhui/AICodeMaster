@@ -96,9 +96,8 @@ public class GItCommitUtil {
                     List<FilePatch> filePatches = IdeaTextPatchBuilder.buildPatch(
                             project,
                             changes,
-                            repository.getRoot().toNioPath(),
-                            false,
-                            true);
+                            repository.getRoot().getPath(),
+                            false);
 
                     // 添加仓库信息
 //                    diffBuilder.append("Repository: ").append(repository.getRoot().getName()).append("\n\n");
@@ -133,12 +132,25 @@ public class GItCommitUtil {
         for (Change change : changes) {
             if (change.getVirtualFile() != null &&
                     change.getVirtualFile().getPath().endsWith(filePath)) {
-                return switch (change.getType()) {
-                    case NEW -> "[ADD]";
-                    case DELETED -> "[DELETE]";
-                    case MOVED -> "[MOVE]";
-                    case MODIFICATION -> "[MODIFY]";
-                };
+                String result;
+                switch (change.getType()) {
+                    case NEW:
+                        result = "[ADD]";
+                        break;
+                    case DELETED:
+                        result = "[DELETE]";
+                        break;
+                    case MOVED:
+                        result = "[MOVE]";
+                        break;
+                    case MODIFICATION:
+                        result = "[MODIFY]";
+                        break;
+                    default:
+                        result = "[UNKNOWN]";
+                        break;
+                }
+                return result;
             }
         }
         return "[UNKNOWN]";

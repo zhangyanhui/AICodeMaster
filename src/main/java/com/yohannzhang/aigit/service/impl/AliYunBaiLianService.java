@@ -29,7 +29,18 @@ public class AliYunBaiLianService implements AIService {
 
     @Override
     public void generateCommitMessageStream(String prompt, Consumer<String> onNext, Consumer<Throwable> onError, Runnable onComplete) throws Exception {
-        OpenAIUtil.getAIResponseStream(Constants.阿里云百炼, prompt, onNext, onError, onComplete);
+        try {
+            OpenAIUtil.getAIResponseStream(Constants.阿里云百炼, prompt, onNext, onError, onComplete);
+        } catch (Exception e) {
+            if (OpenAIUtil.isCancelled()) {
+                log.info("Request was cancelled");
+                if (onError != null) {
+                    onError.accept(new InterruptedException("Request was cancelled"));
+                }
+            } else {
+                throw e;
+            }
+        }
     }
 
 //    @Override

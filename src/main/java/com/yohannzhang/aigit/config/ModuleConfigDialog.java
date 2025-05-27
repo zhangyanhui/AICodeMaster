@@ -48,60 +48,54 @@ public class ModuleConfigDialog extends DialogWrapper {
 
     @Override
     protected @Nullable JComponent createCenterPanel() {
-        // 创建主面板
         JPanel panel = new JPanel(new GridBagLayout());
-        panel.setPreferredSize(new Dimension(700, 200));
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = JBUI.insets(5, 10, 5, 10); // 增加左右间距
+        gbc.insets = JBUI.insets(5);
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.anchor = GridBagConstraints.WEST;
 
-        // 初始化组件
-        urlField = new JTextField();
-        apiKeyField = new JBPasswordField();
-        helpLabel = new JLabel();
-        helpLabel.setForeground(JBColor.GRAY);
-
-        // URL 标签和输入框
+        // URL field
         gbc.gridx = 0;
         gbc.gridy = 0;
-        gbc.weightx = 0;
         panel.add(new JLabel("URL:"), gbc);
 
         gbc.gridx = 1;
         gbc.weightx = 1.0;
+        urlField = new JTextField(30);
         panel.add(urlField, gbc);
 
-        // API Key 标签和输入框
+        // API Key field
         gbc.gridx = 0;
         gbc.gridy = 1;
         gbc.weightx = 0;
         panel.add(new JLabel("API Key:"), gbc);
 
-        // 创建一个面板来容纳密码框和显示按钮
-        JPanel apiKeyPanel = new JPanel(new BorderLayout());
-        apiKeyPanel.add(apiKeyField, BorderLayout.CENTER);
-
-        // 创建显示/隐藏密码的按钮
-        JButton toggleButton = new JButton();
-        toggleButton.setIcon(AllIcons.Actions.Show); // 使用IDEA内置图标
-        toggleButton.setPreferredSize(new Dimension(28, 28));
-        toggleButton.setBorder(BorderFactory.createEmptyBorder());
-        toggleButton.setFocusable(false);
-        toggleButton.addActionListener(e -> togglePasswordVisibility(apiKeyField, toggleButton));
-        apiKeyPanel.add(toggleButton, BorderLayout.EAST);
-
         gbc.gridx = 1;
         gbc.weightx = 1.0;
-        panel.add(apiKeyPanel, gbc);
+        apiKeyField = new JBPasswordField();
+        panel.add(apiKeyField, gbc);
 
-        // 帮助文本
-        gbc.gridx = 1;
+        // Help text
+        gbc.gridx = 0;
         gbc.gridy = 2;
         gbc.gridwidth = 2;
-        gbc.insets = new Insets(0, 10, 5, 10);
-        updateHelpText();
+        gbc.weightx = 1.0;
+        helpLabel = new JLabel("Please enter your API configuration");
+        helpLabel.setForeground(JBColor.GRAY);
         panel.add(helpLabel, gbc);
+
+        // Buttons panel
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        resetButton = new JButton("Reset");
+        checkConfigButton = new JButton("Check Config");
+        buttonPanel.add(resetButton);
+        buttonPanel.add(checkConfigButton);
+
+        gbc.gridx = 0;
+        gbc.gridy = 3;
+        gbc.gridwidth = 2;
+        gbc.weightx = 1.0;
+        panel.add(buttonPanel, gbc);
 
         return panel;
     }
@@ -249,7 +243,7 @@ public class ModuleConfigDialog extends DialogWrapper {
             // 显示密码
             String password = new String(passwordField.getPassword());
             passwordField.setEchoChar((char) 0); // 设置为不隐藏字符
-            toggleButton.setIcon(AllIcons.Actions.ToggleVisibility); // 切换到"隐藏"图标
+            toggleButton.setIcon(AllIcons.Actions.Show); // 切换到"隐藏"图标
         } else {
             // 隐藏密码
             passwordField.setEchoChar('•'); // 恢复为密码字符

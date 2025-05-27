@@ -39,16 +39,33 @@ public class CommitMessageService {
 
 
     public static AIService getAIService(String selectedClient) {
-        return switch (selectedClient) {
-            case Constants.Ollama -> new OllamaService();
-            case Constants.Gemini -> new GeminiService();
-            case Constants.DeepSeek -> new DeepSeekAPIService();
-            case Constants.OpenAI_API -> new OpenAIAPIService();
-            case Constants.CloudflareWorkersAI -> new CloudflareWorkersAIService();
-            case Constants.阿里云百炼 -> new AliYunBaiLianService();
-            case Constants.SiliconFlow -> new SiliconFlowService();
-            default -> throw new IllegalArgumentException("Invalid LLM client: " + selectedClient);
-        };
+        AIService service;
+        switch (selectedClient) {
+            case Constants.Ollama:
+                service = new OllamaService();
+                break;
+            case Constants.Gemini:
+                service = new GeminiService();
+                break;
+            case Constants.DeepSeek:
+                service = new DeepSeekAPIService();
+                break;
+            case Constants.OpenAI_API:
+                service = new OpenAIAPIService();
+                break;
+            case Constants.CloudflareWorkersAI:
+                service = new CloudflareWorkersAIService();
+                break;
+            case Constants.阿里云百炼:
+                service = new AliYunBaiLianService();
+                break;
+            case Constants.SiliconFlow:
+                service = new SiliconFlowService();
+                break;
+            default:
+                throw new IllegalArgumentException("Invalid LLM client: " + selectedClient);
+        }
+        return service;
     }
 
 }

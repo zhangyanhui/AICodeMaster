@@ -64,6 +64,14 @@ public class OpenAIUtil {
         isCancelled = true;
     }
 
+    public static boolean isCancelled() {
+        return isCancelled;
+    }
+
+    public static void resetCancelled() {
+        isCancelled = false;
+    }
+
     public static void getAIResponseStream(String client, String textContent, Consumer<String> onNext, Consumer<Throwable> onError, Runnable onComplete) throws Exception {
         isCancelled = false;
 

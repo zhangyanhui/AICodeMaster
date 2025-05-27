@@ -12,25 +12,37 @@ import com.intellij.openapi.ui.Messages;
 public class IdeaDialogUtil {
 
     public static void showWarning(Project project, String message, String title) {
-        ApplicationManager.getApplication().invokeLater(() -> Messages.showWarningDialog(project, message, title));
+        ApplicationManager.getApplication().invokeLater(() -> {
+            if (project != null && !project.isDisposed()) {
+                Messages.showWarningDialog(project, message, title);
+            } else {
+                Messages.showWarningDialog(message, title);
+            }
+        });
     }
 
     public static void showError(Project project, String message, String title) {
-        ApplicationManager.getApplication().invokeLater(() -> Messages.showErrorDialog(project, message, title));
+        ApplicationManager.getApplication().invokeLater(() -> {
+            if (project != null && !project.isDisposed()) {
+                Messages.showErrorDialog(project, message, title);
+            } else {
+                Messages.showErrorDialog(message, title);
+            }
+        });
     }
 
     public static void handleModuleNecessaryConfigIsWrong(Project project) {
-        Messages.showWarningDialog(project, "Please check the necessary configuration.",
+        showWarning(project, "Please check the necessary configuration.",
                 "Necessary Configuration Error");
     }
 
     public static void handleNoChangesSelected(Project project) {
-        Messages.showWarningDialog(project, "No changes selected. Please select files to commit.",
+        showWarning(project, "No changes selected. Please select files to commit.",
                 "No Changes Selected");
     }
 
     public static void handleGenerationError(Project project, String errorMessage) {
-        IdeaDialogUtil.showError(project, "Error generating commit message: " + errorMessage, "Error");
+        showError(project, "Error generating commit message: " + errorMessage, "Error");
     }
 
 }

@@ -60,6 +60,19 @@
             border-radius: 5px;
             overflow-x: auto;
         }
+         .welcome-container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        .welcome-header { text-align: center; margin-bottom: 40px; }
+        .welcome-title { font-size: 32px; margin-bottom: 12px; font-weight: 600; }
+        .welcome-subtitle { font-size: 18px; opacity: 0.8; }
+        .welcome-content { text-align: center; margin-top: 40px; }
+        .welcome-text { font-size: 16px; line-height: 2.0; margin-bottom: 20px; }
+        .feature-item { display: flex; align-items: center; justify-content: center; margin: 12px 0; }
+        .feature-icon { margin-right: 12px; font-size: 20px; }
+        .feature-text { text-align: left; }
+        .delete-btn:hover { color: #ff6b6b !important; background-color: rgba(255, 107, 107, 0.1); }
+        .chat-item { position: relative; }
+        .chat-item:hover .delete-btn { opacity: 1; }
+        .delete-btn { opacity: 0; transition: opacity 0.2s, color 0.2s, background-color 0.2s; }
 
 pre code.hljs{display:block;overflow-x:auto;padding:1em}code.hljs{padding:3px 5px}.hljs{background:#f3f3f3;color:#444}.hljs-comment{color:#697070}.hljs-punctuation,.hljs-tag{color:#444a}.hljs-tag .hljs-attr,.hljs-tag .hljs-name{color:#444}.hljs-attribute,.hljs-doctag,.hljs-keyword,.hljs-meta .hljs-keyword,.hljs-name,.hljs-selector-tag{font-weight:700}.hljs-deletion,.hljs-number,.hljs-quote,.hljs-selector-class,.hljs-selector-id,.hljs-string,.hljs-template-tag,.hljs-type{color:#800}.hljs-section,.hljs-title{color:#800;font-weight:700}.hljs-link,.hljs-operator,.hljs-regexp,.hljs-selector-attr,.hljs-selector-pseudo,.hljs-symbol,.hljs-template-variable,.hljs-variable{color:#ab5656}.hljs-literal{color:#695}.hljs-addition,.hljs-built_in,.hljs-bullet,.hljs-code{color:#397300}.hljs-meta{color:#1f7199}.hljs-meta .hljs-string{color:#38a}.hljs-emphasis{font-style:italic}.hljs-strong{font-weight:700}
     </style>
@@ -1271,22 +1284,22 @@ return je}()
 </head>
 <body>
 
-<div class="markdown-body" id="content">
-    <p>欢迎使用 <strong>AI Code Master</strong> 插件！🌟<br>
-        这是一款专为 IntelliJ IDEA 打造的 AI 辅助工具，助您：</p>
-    <ul>
-        <li>智能生成提交信息</li>
-        <li>清晰解释代码功能</li>
-        <li>提供优化建议</li>
-        <li>快速发起交互式对话</li>
-    </ul>
-    <p><strong>支持的模型</strong>：</p>
-    <ul>
-        <li><strong>阿里云</strong>：稳定高效的云端 AI 服务</li>
-        <li><strong>DeepSeek</strong>：专注于深度学习的强大模型</li>
-        <li><strong>本地大模型</strong>：支持本地部署，保障数据安全</li>
-    </ul>
-    <p>让开发更高效，体验更智能！🚀</p>
+<div id='content'>
+    <div class='welcome-container'>
+        <div class='welcome-header'>
+            <div class='welcome-title'>AI 编程助手</div>
+            <div class='welcome-subtitle'>智能编程，高效开发</div>
+        </div>
+        <div class='welcome-content'>
+            <div class='welcome-text'>
+                <div class='feature-item'><span class='feature-icon'>✨</span><span class='feature-text'>代码分析优化</span></div>
+                <div class='feature-item'><span class='feature-icon'>🔍</span><span class='feature-text'>问题诊断修复</span></div>
+                <div class='feature-item'><span class='feature-icon'>🚀</span><span class='feature-text'>代码重构优化</span></div>
+                <div class='feature-item'><span class='feature-icon'>💡</span><span class='feature-text'>最佳实践指导</span></div>
+                <div class='feature-item'><span class='feature-icon'>🤖</span><span class='feature-text'>智能代码补全</span></div>
+            </div>
+        </div>
+    </div>
 </div>
 <script>
     function updateContent(html) {
@@ -1315,6 +1328,21 @@ return je}()
             }
         });
     }
+    function deleteQuestion(btn) {
+            const questionDiv = btn.closest('.question-item');
+            const nextHr = questionDiv.nextElementSibling;
+            const answerDiv = nextHr ? nextHr.nextElementSibling : null;
+            const nextHr2 = answerDiv ? answerDiv.nextElementSibling : null;
+
+            if (questionDiv) questionDiv.remove();
+            if (nextHr) nextHr.remove();
+            if (answerDiv) answerDiv.remove();
+            if (nextHr2) nextHr2.remove();
+
+            if (document.querySelectorAll('.chat-item').length === 0) {
+                document.getElementById('content').innerHTML = document.querySelector('.welcome-container').outerHTML;
+            }
+        }
 </script>
 </body>
 </html>

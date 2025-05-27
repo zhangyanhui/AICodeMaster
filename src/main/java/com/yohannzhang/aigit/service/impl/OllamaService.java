@@ -5,8 +5,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yohannzhang.aigit.config.ApiKeySettings;
 import com.yohannzhang.aigit.constant.Constants;
 import com.yohannzhang.aigit.service.AIService;
+import com.yohannzhang.aigit.util.OpenAIUtil;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -24,16 +27,15 @@ import java.util.function.Consumer;
  * @author hmydk
  */
 public class OllamaService implements AIService {
+    private static final Logger log = LoggerFactory.getLogger(OllamaService.class);
+
     @Override
     public boolean generateByStream() {
         return true;
     }
 
-    // private static final Logger log =
-    // LoggerFactory.getLogger(OllamaService.class);
     @Override
     public String generateCommitMessage(String content) throws Exception {
-
         ApiKeySettings settings = ApiKeySettings.getInstance();
         String selectedModule = settings.getSelectedModule();
         ApiKeySettings.ModuleConfig moduleConfig = settings.getModuleConfigs().get(Constants.Ollama);
@@ -44,7 +46,18 @@ public class OllamaService implements AIService {
 
     @Override
     public void generateCommitMessageStream(String content, Consumer<String> onNext, Consumer<Throwable> onError, Runnable onComplete) throws Exception {
-        getAIResponseStream(content, onNext);
+        try {
+            getAIResponseStream(content, onNext, onError, onComplete);
+        } catch (Exception e) {
+            if (OpenAIUtil.isCancelled()) {
+                log.info("Request was cancelled");
+                if (onError != null) {
+                    onError.accept(new InterruptedException("Request was cancelled"));
+                }
+            } else {
+                throw e;
+            }
+        }
     }
 
     @Override
@@ -92,7 +105,6 @@ public class OllamaService implements AIService {
 
     private static @NotNull HttpURLConnection getHttpURLConnection(String module, String url, String textContent)
             throws IOException {
-
         GenerateRequest request = new GenerateRequest(module, textContent, false);
         ObjectMapper objectMapper = new ObjectMapper();
         String jsonInputString = objectMapper.writeValueAsString(request);
@@ -102,6 +114,8 @@ public class OllamaService implements AIService {
         connection.setRequestMethod("POST");
         connection.setRequestProperty("Content-Type", "application/json");
         connection.setDoOutput(true);
+        connection.setConnectTimeout(30000); // 连接超时：30秒
+        connection.setReadTimeout(30000); // 读取超时：30秒
 
         try (OutputStream os = connection.getOutputStream()) {
             byte[] input = jsonInputString.getBytes(StandardCharsets.UTF_8);
@@ -147,7 +161,9 @@ public class OllamaService implements AIService {
         }
     }
 
-    private void getAIResponseStream(String textContent, Consumer<String> onNext) throws Exception {
+    private void getAIResponseStream(String textContent, Consumer<String> onNext, Consumer<Throwable> onError, Runnable onComplete) throws Exception {
+        OpenAIUtil.resetCancelled();
+        
         ApiKeySettings settings = ApiKeySettings.getInstance();
         String selectedModule = settings.getSelectedModule();
         ApiKeySettings.ModuleConfig moduleConfig = settings.getModuleConfigs().get(Constants.Ollama);
@@ -161,23 +177,36 @@ public class OllamaService implements AIService {
         connection.setRequestMethod("POST");
         connection.setRequestProperty("Content-Type", "application/json");
         connection.setDoOutput(true);
+        connection.setConnectTimeout(30000); // 连接超时：30秒
+        connection.setReadTimeout(30000); // 读取超时：30秒
 
         try (OutputStream os = connection.getOutputStream()) {
             byte[] input = jsonInputString.getBytes(StandardCharsets.UTF_8);
             os.write(input, 0, input.length);
         }
 
-        try (BufferedReader br = new BufferedReader(
-                new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = br.readLine()) != null) {
-                JsonNode jsonResponse = objectMapper.readTree(line);
-                String response = jsonResponse.path("response").asText();
-                if (!response.isEmpty()) {
-                    onNext.accept(response);
+        new Thread(() -> {
+            try (BufferedReader br = new BufferedReader(
+                    new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = br.readLine()) != null && !OpenAIUtil.isCancelled()) {
+                    JsonNode jsonResponse = objectMapper.readTree(line);
+                    String response = jsonResponse.path("response").asText();
+                    if (!response.isEmpty()) {
+                        onNext.accept(response);
+                    }
                 }
+            } catch (IOException e) {
+                if (!OpenAIUtil.isCancelled() && onError != null) {
+                    onError.accept(e);
+                }
+            } finally {
+                if (onComplete != null) {
+                    onComplete.run();
+                }
+                connection.disconnect();
             }
-        }
+        }).start();
     }
 
     // public static void main(String[] args) {
