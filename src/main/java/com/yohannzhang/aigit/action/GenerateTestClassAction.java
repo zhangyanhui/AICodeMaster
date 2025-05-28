@@ -5,7 +5,9 @@ import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
-import com.intellij.psi.*;
+import com.intellij.psi.PsiClass;
+import com.intellij.psi.PsiElement;
+import com.intellij.psi.PsiFile;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.yohannzhang.aigit.service.TestClassGeneratorService;
 import com.yohannzhang.aigit.ui.CombinedWindowFactory;
@@ -27,14 +29,14 @@ public class GenerateTestClassAction extends AnAction {
         int offset = editor.getCaretModel().getOffset();
         PsiElement element = psiFile.findElementAt(offset);
         PsiClass psiClass = PsiTreeUtil.getParentOfType(element, PsiClass.class);
-        
+
         if (psiClass == null) {
             return;
         }
 
         // 创建测试类生成服务
         TestClassGeneratorService service = new TestClassGeneratorService(project, psiClass);
-        
+
         // 获取输出面板
         CombinedWindowFactory windowFactory = CombinedWindowFactory.getInstance(project);
         if (windowFactory == null) return;
@@ -43,12 +45,12 @@ public class GenerateTestClassAction extends AnAction {
         service.generateTestClass(new TestClassGeneratorService.TestGenerationCallback() {
             @Override
             public void onTokenReceived(String token) {
-                windowFactory.updateResult(token);
+                windowFactory.updateResult(token, project);
             }
 
             @Override
             public void onError(Throwable error) {
-                windowFactory.updateResult("生成测试类时发生错误: " + error.getMessage());
+                windowFactory.updateResult("生成测试类时发生错误: " + error.getMessage(), project);
             }
 
             @Override

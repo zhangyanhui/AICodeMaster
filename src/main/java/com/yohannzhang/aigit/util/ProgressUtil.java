@@ -7,12 +7,12 @@ import com.intellij.openapi.project.Project;
 import org.jetbrains.annotations.NotNull;
 
 public class ProgressUtil {
-    
-    public static void runWithProgress(@NotNull Project project, 
-                                     @NotNull String title,
-                                     @NotNull String message,
-                                     boolean canBeCancelled,
-                                     @NotNull Runnable task) {
+
+    public static void runWithProgress(@NotNull Project project,
+                                       @NotNull String title,
+                                       @NotNull String message,
+                                       boolean canBeCancelled,
+                                       @NotNull Runnable task) {
         ProgressManager.getInstance().run(new Task.Backgroundable(project, title, canBeCancelled) {
             @Override
             public void run(@NotNull ProgressIndicator indicator) {
@@ -29,10 +29,10 @@ public class ProgressUtil {
     }
 
     public static void runWithProgressAndPercentage(@NotNull Project project,
-                                                  @NotNull String title,
-                                                  @NotNull String message,
-                                                  boolean canBeCancelled,
-                                                  @NotNull ProgressTask task) {
+                                                    @NotNull String title,
+                                                    @NotNull String message,
+                                                    boolean canBeCancelled,
+                                                    @NotNull ProgressTask task) {
         ProgressManager.getInstance().run(new Task.Backgroundable(project, title, canBeCancelled) {
             @Override
             public void run(@NotNull ProgressIndicator indicator) {

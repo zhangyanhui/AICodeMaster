@@ -8,11 +8,9 @@ import com.intellij.util.ProcessingContext;
 import com.yohannzhang.aigit.service.CodeService;
 import org.jetbrains.annotations.NotNull;
 
-
-import java.io.IOException;
-
 /**
  * 代码补全
+ *
  * @author yanhuizhang
  * @date 2025/5/22 22:26
  */
@@ -48,8 +46,9 @@ public class AICodeCompletionContributor extends CompletionContributor {
         String promt = "你是一个Java代码专家，请根据给定的代码片段，进行代码补全。代码如下：" + context;
 
         CodeService codeService = new CodeService();
+        return "";
 
-        return codeService.generateCommitMessage(promt);
+//        return codeService.generateCommitMessage(promt);
 //        OkHttpClient client = new OkHttpClient();
 //        MediaType JSON = MediaType.parse("application/json; charset=utf-8");
 //        String jsonBody = "{\"model\": \"code-davinci-002\", \"prompt\": \"" + context + "\", \"max_tokens\": 50}";

@@ -2,8 +2,7 @@ package com.yohannzhang.aigit.service;
 
 
 import com.yohannzhang.aigit.config.ApiKeySettings;
-import com.yohannzhang.aigit.constant.Constants;
-import com.yohannzhang.aigit.service.impl.*;
+import com.yohannzhang.aigit.factory.AIServiceFactory;
 
 import java.util.function.Consumer;
 
@@ -12,10 +11,10 @@ public class CodeService {
 
     ApiKeySettings settings = ApiKeySettings.getInstance();
 
-    public CodeService() {
-        String selectedClient = settings.getSelectedClient();
-        this.aiService = getAIService(selectedClient);
-    }
+//    public CodeService() {
+//        String selectedClient = settings.getSelectedClient();
+//        this.aiService = getAIService(selectedClient);
+//    }
 
     public boolean checkNecessaryModuleConfigIsRight() {
         return aiService.checkNecessaryModuleConfigIsRight();
@@ -36,17 +35,9 @@ public class CodeService {
     }
 
 
-    public static AIService getAIService(String selectedClient) {
-        return switch (selectedClient) {
-            case Constants.Ollama -> new OllamaService();
-            case Constants.Gemini -> new GeminiService();
-            case Constants.DeepSeek -> new DeepSeekAPIService();
-            case Constants.OpenAI_API -> new OpenAIAPIService();
-            case Constants.CloudflareWorkersAI -> new CloudflareWorkersAIService();
-            case Constants.阿里云百炼 -> new AliYunBaiLianService();
-            case Constants.SiliconFlow -> new SiliconFlowService();
-            default -> throw new IllegalArgumentException("Invalid LLM client: " + selectedClient);
-        };
+    public CodeService() {
+        String selectedClient = settings.getSelectedClient();
+        this.aiService = AIServiceFactory.createAIService(selectedClient);
     }
 
 }

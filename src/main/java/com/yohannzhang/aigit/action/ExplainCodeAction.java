@@ -27,9 +27,9 @@ public class ExplainCodeAction extends AnAction {
         String selectedText = editor.getSelectionModel().getSelectedText();
         if (selectedText == null || selectedText.trim().isEmpty()) {
             com.intellij.openapi.ui.Messages.showWarningDialog(
-                project,
-                "Please select the code you want to explain.",
-                "No Code Selected"
+                    project,
+                    "Please select the code you want to explain.",
+                    "No Code Selected"
             );
             return;
         }
@@ -38,55 +38,55 @@ public class ExplainCodeAction extends AnAction {
         String prompt = String.format("解释以下代码的功能和实现原理：\n%s", formattedCode);
 
         ProgressUtil.runWithProgress(
-            project,
-            "Explaining Code",
-            "Analyzing and explaining code...",
-            true,
-            () -> {
-                CodeService codeService = new CodeService();
-                try {
-                    if (codeService.generateByStream()) {
-                        codeService.generateCommitMessageStream(
-                            prompt,
-                            token -> {
-                                // 使用 WriteCommandAction 更新文档
-                                ApplicationManager.getApplication().invokeLater(() -> {
-                                    WriteCommandAction.runWriteCommandAction(project, () -> {
-                                        editor.getDocument().insertString(
-                                            editor.getSelectionModel().getSelectionStart(),
-                                            token
-                                        );
-                                    });
-                                });
-                            },
-                            error -> {
-                                ApplicationManager.getApplication().invokeLater(() -> {
-                                    com.intellij.openapi.ui.Messages.showErrorDialog(
-                                        project,
-                                        "Failed to explain code: " + error.getMessage(),
-                                        "Error"
-                                    );
-                                });
-                            },
-                            () -> {
-                                ApplicationManager.getApplication().invokeLater(() -> {
-                                    WriteCommandAction.runWriteCommandAction(project, () -> {
-                                        editor.getSelectionModel().removeSelection();
-                                    });
-                                });
-                            }
-                        );
+                project,
+                "Explaining Code",
+                "Analyzing and explaining code...",
+                true,
+                () -> {
+                    CodeService codeService = new CodeService();
+                    try {
+                        if (codeService.generateByStream()) {
+                            codeService.generateCommitMessageStream(
+                                    prompt,
+                                    token -> {
+                                        // 使用 WriteCommandAction 更新文档
+                                        ApplicationManager.getApplication().invokeLater(() -> {
+                                            WriteCommandAction.runWriteCommandAction(project, () -> {
+                                                editor.getDocument().insertString(
+                                                        editor.getSelectionModel().getSelectionStart(),
+                                                        token
+                                                );
+                                            });
+                                        });
+                                    },
+                                    error -> {
+                                        ApplicationManager.getApplication().invokeLater(() -> {
+                                            com.intellij.openapi.ui.Messages.showErrorDialog(
+                                                    project,
+                                                    "Failed to explain code: " + error.getMessage(),
+                                                    "Error"
+                                            );
+                                        });
+                                    },
+                                    () -> {
+                                        ApplicationManager.getApplication().invokeLater(() -> {
+                                            WriteCommandAction.runWriteCommandAction(project, () -> {
+                                                editor.getSelectionModel().removeSelection();
+                                            });
+                                        });
+                                    }
+                            );
+                        }
+                    } catch (Exception ex) {
+                        ApplicationManager.getApplication().invokeLater(() -> {
+                            com.intellij.openapi.ui.Messages.showErrorDialog(
+                                    project,
+                                    "Failed to explain code: " + ex.getMessage(),
+                                    "Error"
+                            );
+                        });
                     }
-                } catch (Exception ex) {
-                    ApplicationManager.getApplication().invokeLater(() -> {
-                        com.intellij.openapi.ui.Messages.showErrorDialog(
-                            project,
-                            "Failed to explain code: " + ex.getMessage(),
-                            "Error"
-                        );
-                    });
                 }
-            }
         );
     }
 

@@ -44,8 +44,9 @@ public class ChatHistoryService implements PersistentStateComponent<ChatHistoryS
 
     /**
      * 添加新的问答记录
+     *
      * @param question 用户问题
-     * @param answer AI回答
+     * @param answer   AI回答
      */
     public void addChatRecord(String question, String answer) {
         state.chatHistoryMap.put(question, answer);
@@ -53,6 +54,7 @@ public class ChatHistoryService implements PersistentStateComponent<ChatHistoryS
 
     /**
      * 获取不可修改的历史记录视图
+     *
      * @return 只读的聊天历史Map
      */
     public Map<String, String> getChatHistory() {
@@ -68,6 +70,7 @@ public class ChatHistoryService implements PersistentStateComponent<ChatHistoryS
 
     /**
      * 删除指定问题的记录
+     *
      * @param question 要删除的问题
      * @return 是否成功删除
      */
@@ -77,6 +80,7 @@ public class ChatHistoryService implements PersistentStateComponent<ChatHistoryS
 
     /**
      * 获取最近N条聊天记录
+     *
      * @param limit 最大记录数
      * @return 截取后的Map
      */

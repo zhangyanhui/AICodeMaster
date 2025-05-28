@@ -27,54 +27,59 @@
     </style>
 </head>
 <body>
-    <div id='content'>
-        <div class='welcome-container'>
-            <div class='welcome-header'>
-                <div class='welcome-title'>AI 编程助手</div>
-                <div class='welcome-subtitle'>智能编程，高效开发</div>
-            </div>
-            <div class='welcome-content'>
-                <div class='welcome-text'>
-                    <div class='feature-item'><span class='feature-icon'>✨</span><span class='feature-text'>代码分析优化</span></div>
-                    <div class='feature-item'><span class='feature-icon'>🔍</span><span class='feature-text'>问题诊断修复</span></div>
-                    <div class='feature-item'><span class='feature-icon'>🚀</span><span class='feature-text'>代码重构优化</span></div>
-                    <div class='feature-item'><span class='feature-icon'>💡</span><span class='feature-text'>最佳实践指导</span></div>
-                    <div class='feature-item'><span class='feature-icon'>🤖</span><span class='feature-text'>智能代码补全</span></div>
-                </div>
+<div id='content'>
+    <div class='welcome-container'>
+        <div class='welcome-header'>
+            <div class='welcome-title'>AI 编程助手</div>
+            <div class='welcome-subtitle'>智能编程，高效开发</div>
+        </div>
+        <div class='welcome-content'>
+            <div class='welcome-text'>
+                <div class='feature-item'><span class='feature-icon'>✨</span><span
+                        class='feature-text'>代码分析优化</span></div>
+                <div class='feature-item'><span class='feature-icon'>🔍</span><span
+                        class='feature-text'>问题诊断修复</span></div>
+                <div class='feature-item'><span class='feature-icon'>🚀</span><span
+                        class='feature-text'>代码重构优化</span></div>
+                <div class='feature-item'><span class='feature-icon'>💡</span><span
+                        class='feature-text'>最佳实践指导</span></div>
+                <div class='feature-item'><span class='feature-icon'>🤖</span><span
+                        class='feature-text'>智能代码补全</span></div>
             </div>
         </div>
     </div>
-    <script>
-        function addCopyButtons() {
-            document.querySelectorAll('pre code').forEach((block) => {
-                const button = document.createElement('button');
-                button.className = 'copy-button';
-                button.textContent = '复制';
-                button.style.cssText = 'position: absolute; top: 5px; right: 5px; padding: 5px 10px; background: #e1e4e8; border: none; border-radius: 3px; cursor: pointer;';
-                block.parentNode.style.position = 'relative';
-                block.parentNode.appendChild(button);
-                button.addEventListener('click', () => {
-                    navigator.clipboard.writeText(block.textContent);
-                    button.textContent = '已复制';
-                    setTimeout(() => button.textContent = '复制', 2000);
-                });
+</div>
+<script>
+    function addCopyButtons() {
+        document.querySelectorAll('pre code').forEach((block) => {
+            const button = document.createElement('button');
+            button.className = 'copy-button';
+            button.textContent = '复制';
+            button.style.cssText = 'position: absolute; top: 5px; right: 5px; padding: 5px 10px; background: #e1e4e8; border: none; border-radius: 3px; cursor: pointer;';
+            block.parentNode.style.position = 'relative';
+            block.parentNode.appendChild(button);
+            button.addEventListener('click', () => {
+                navigator.clipboard.writeText(block.textContent);
+                button.textContent = '已复制';
+                setTimeout(() => button.textContent = '复制', 2000);
             });
+        });
+    }
+    function deleteQuestion(btn) {
+        const questionDiv = btn.closest('.question-item');
+        const nextHr = questionDiv.nextElementSibling;
+        const answerDiv = nextHr ? nextHr.nextElementSibling : null;
+        const nextHr2 = answerDiv ? answerDiv.nextElementSibling : null;
+
+        if (questionDiv) questionDiv.remove();
+        if (nextHr) nextHr.remove();
+        if (answerDiv) answerDiv.remove();
+        if (nextHr2) nextHr2.remove();
+
+        if (document.querySelectorAll('.chat-item').length === 0) {
+            document.getElementById('content').innerHTML = document.querySelector('.welcome-container').outerHTML;
         }
-        function deleteQuestion(btn) {
-            const questionDiv = btn.closest('.question-item');
-            const nextHr = questionDiv.nextElementSibling;
-            const answerDiv = nextHr ? nextHr.nextElementSibling : null;
-            const nextHr2 = answerDiv ? answerDiv.nextElementSibling : null;
-            
-            if (questionDiv) questionDiv.remove();
-            if (nextHr) nextHr.remove();
-            if (answerDiv) answerDiv.remove();
-            if (nextHr2) nextHr2.remove();
-            
-            if (document.querySelectorAll('.chat-item').length === 0) {
-                document.getElementById('content').innerHTML = document.querySelector('.welcome-container').outerHTML;
-            }
-        }
-    </script>
+    }
+</script>
 </body>
 </html> 

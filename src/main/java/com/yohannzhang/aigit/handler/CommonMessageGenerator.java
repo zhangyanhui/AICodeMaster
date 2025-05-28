@@ -4,7 +4,7 @@ package com.yohannzhang.aigit.handler;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.yohannzhang.aigit.service.CodeService;
-import com.yohannzhang.aigit.ui.AIGuiComponent;
+import com.yohannzhang.aigit.ui.CombinedWindowFactory;
 import com.yohannzhang.aigit.util.IdeaDialogUtil;
 
 public class CommonMessageGenerator {
@@ -27,7 +27,7 @@ public class CommonMessageGenerator {
                     token -> handleTokenResponse(token),
                     this::handleErrorResponse,
                     () -> ApplicationManager.getApplication().invokeLater(() -> {
-                        AIGuiComponent.getInstance(project).getWindowFactory().resetButton();
+                        CombinedWindowFactory.getInstance(project).resetButton(project);
                     })
             );
         } catch (Exception e) {
@@ -38,10 +38,10 @@ public class CommonMessageGenerator {
     private void handleTokenResponse(String token) {
         ApplicationManager.getApplication().invokeLater(() -> {
             messageBuilder.append(token);
-            AIGuiComponent.getInstance(project).getWindowFactory()
-                    .updateResult(messageBuilder.toString());
-            AIGuiComponent.getInstance(project).getWindowFactory()
-                    .submitButton();
+            CombinedWindowFactory.getInstance(project)
+                    .updateResult(messageBuilder.toString(), project);
+            CombinedWindowFactory.getInstance(project)
+                    .submitButton(project);
         });
     }
 

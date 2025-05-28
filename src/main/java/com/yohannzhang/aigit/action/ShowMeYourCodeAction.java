@@ -14,7 +14,7 @@ import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.openapi.wm.ToolWindowManager;
 import com.yohannzhang.aigit.constant.Constants;
 import com.yohannzhang.aigit.service.CodeService;
-import com.yohannzhang.aigit.ui.AIGuiComponent;
+import com.yohannzhang.aigit.ui.CombinedWindowFactory;
 import com.yohannzhang.aigit.util.CodeUtil;
 import com.yohannzhang.aigit.util.IdeaDialogUtil;
 import org.jetbrains.annotations.NotNull;
@@ -76,7 +76,7 @@ public class ShowMeYourCodeAction extends AnAction {
                                         },
                                         this::handleErrorResponse,
                                         () -> ApplicationManager.getApplication().invokeLater(() -> {
-                                            AIGuiComponent.getInstance(project).getWindowFactory().resetButton();
+                                            CombinedWindowFactory.getInstance(project).resetButton(project);
 
                                         })
                                 );
@@ -97,8 +97,8 @@ public class ShowMeYourCodeAction extends AnAction {
                     private void handleTokenResponse(String token) {
                         ApplicationManager.getApplication().invokeLater(() -> {
 //                            messageBuilder.append(token);
-                            AIGuiComponent.getInstance(project).getWindowFactory().updateResult(messageBuilder.toString());
-                            AIGuiComponent.getInstance(project).getWindowFactory().submitButton();
+                            CombinedWindowFactory.getInstance(project).updateResult(messageBuilder.toString(), project);
+                            CombinedWindowFactory.getInstance(project).submitButton(project);
 
                         });
                     }

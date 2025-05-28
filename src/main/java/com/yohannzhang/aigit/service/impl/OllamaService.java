@@ -24,9 +24,15 @@ import java.util.function.Consumer;
  * @author hmydk
  */
 public class OllamaService implements AIService {
+    private static volatile boolean isCancelled = false;
+
     @Override
     public boolean generateByStream() {
         return true;
+    }
+
+    public static void cancelRequest() {
+        isCancelled = true;
     }
 
     // private static final Logger log =
@@ -44,7 +50,7 @@ public class OllamaService implements AIService {
 
     @Override
     public void generateCommitMessageStream(String content, Consumer<String> onNext, Consumer<Throwable> onError, Runnable onComplete) throws Exception {
-        getAIResponseStream(content, onNext);
+        getAIResponseStream(content, onNext, onError, onComplete);
     }
 
     @Override
@@ -147,7 +153,10 @@ public class OllamaService implements AIService {
         }
     }
 
-    private void getAIResponseStream(String textContent, Consumer<String> onNext) throws Exception {
+    private void getAIResponseStream(String textContent, Consumer<String> onNext,
+                                     Consumer<Throwable> onError, Runnable onComplete) throws Exception {
+        isCancelled = false;
+
         ApiKeySettings settings = ApiKeySettings.getInstance();
         String selectedModule = settings.getSelectedModule();
         ApiKeySettings.ModuleConfig moduleConfig = settings.getModuleConfigs().get(Constants.Ollama);
@@ -156,28 +165,42 @@ public class OllamaService implements AIService {
         ObjectMapper objectMapper = new ObjectMapper();
         String jsonInputString = objectMapper.writeValueAsString(request);
 
-        URI uri = URI.create(moduleConfig.getUrl());
-        HttpURLConnection connection = (HttpURLConnection) uri.toURL().openConnection();
-        connection.setRequestMethod("POST");
-        connection.setRequestProperty("Content-Type", "application/json");
-        connection.setDoOutput(true);
+        new Thread(() -> {
+            HttpURLConnection connection = null;
+            try {
+                URI uri = URI.create(moduleConfig.getUrl());
+                connection = (HttpURLConnection) uri.toURL().openConnection();
+                connection.setRequestMethod("POST");
+                connection.setRequestProperty("Content-Type", "application/json");
+                connection.setDoOutput(true);
 
-        try (OutputStream os = connection.getOutputStream()) {
-            byte[] input = jsonInputString.getBytes(StandardCharsets.UTF_8);
-            os.write(input, 0, input.length);
-        }
+                try (OutputStream os = connection.getOutputStream()) {
+                    byte[] input = jsonInputString.getBytes(StandardCharsets.UTF_8);
+                    os.write(input, 0, input.length);
+                }
 
-        try (BufferedReader br = new BufferedReader(
-                new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = br.readLine()) != null) {
-                JsonNode jsonResponse = objectMapper.readTree(line);
-                String response = jsonResponse.path("response").asText();
-                if (!response.isEmpty()) {
-                    onNext.accept(response);
+                try (BufferedReader br = new BufferedReader(
+                        new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
+                    String line;
+                    while ((line = br.readLine()) != null && !isCancelled) {
+                        JsonNode jsonResponse = objectMapper.readTree(line);
+                        String response = jsonResponse.path("response").asText();
+                        if (!response.isEmpty()) {
+                            onNext.accept(response);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                if (!isCancelled) {
+                    onError.accept(e);
+                }
+            } finally {
+                onComplete.run();
+                if (connection != null) {
+                    connection.disconnect();
                 }
             }
-        }
+        }).start();
     }
 
     // public static void main(String[] args) {
