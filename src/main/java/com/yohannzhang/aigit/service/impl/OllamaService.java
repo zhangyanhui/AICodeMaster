@@ -93,7 +93,39 @@ public class OllamaService implements AIService {
 
         ObjectMapper objectMapper = new ObjectMapper();
         JsonNode jsonResponse = objectMapper.readTree(response.toString());
-        return jsonResponse.path("response").asText();
+        String rawResponse = jsonResponse.path("response").asText();
+        return removeThinkTags(rawResponse);
+    }
+
+    private static String removeThinkTags(String content) {
+        if (content == null || content.isEmpty()) {
+            return content;
+        }
+        
+        StringBuilder result = new StringBuilder();
+        boolean inThinkTag = false;
+        int i = 0;
+        
+        while (i < content.length()) {
+            if (i + 6 < content.length() && content.substring(i, i + 6).equals("<think>")) {
+                inThinkTag = true;
+                i += 6;
+                continue;
+            }
+            
+            if (i + 7 < content.length() && content.substring(i, i + 7).equals("</think>")) {
+                inThinkTag = false;
+                i += 7;
+                continue;
+            }
+            
+            if (!inThinkTag) {
+                result.append(content.charAt(i));
+            }
+            i++;
+        }
+        
+        return result.toString().trim();
     }
 
     private static @NotNull HttpURLConnection getHttpURLConnection(String module, String url, String textContent)
@@ -164,6 +196,8 @@ public class OllamaService implements AIService {
         GenerateRequest request = new GenerateRequest(selectedModule, textContent, true);
         ObjectMapper objectMapper = new ObjectMapper();
         String jsonInputString = objectMapper.writeValueAsString(request);
+        //定义一个字符串存储响应结果
+        StringBuilder fullResponse = new StringBuilder();
 
         new Thread(() -> {
             HttpURLConnection connection = null;
@@ -186,7 +220,18 @@ public class OllamaService implements AIService {
                         JsonNode jsonResponse = objectMapper.readTree(line);
                         String response = jsonResponse.path("response").asText();
                         if (!response.isEmpty()) {
-                            onNext.accept(response);
+                            //拼接响应结果
+                            fullResponse.append(response);
+                            //判断响应结果中是否包含<think>内容</think>,如只包含<think>则跳过，若包含</think>,则取</think>之后的内容返回
+                            if(fullResponse.toString().contains("<think>")&&!fullResponse.toString().contains("</think>")){
+                                continue;
+                            }
+                          System.out.println("==="+fullResponse);
+
+
+                            if (!response.isEmpty()) {
+                                onNext.accept(response);
+                            }
                         }
                     }
                 }

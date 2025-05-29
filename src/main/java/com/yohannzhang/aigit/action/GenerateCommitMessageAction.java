@@ -19,7 +19,6 @@ import com.intellij.openapi.vcs.ui.CommitMessage;
 import com.intellij.vcs.commit.AbstractCommitWorkflowHandler;
 import com.yohannzhang.aigit.constant.Constants;
 import com.yohannzhang.aigit.service.CommitMessageService;
-import com.yohannzhang.aigit.ui.CombinedWindowFactory;
 import com.yohannzhang.aigit.util.GItCommitUtil;
 import com.yohannzhang.aigit.util.IdeaDialogUtil;
 import git4idea.GitLocalBranch;
@@ -130,9 +129,8 @@ public class GenerateCommitMessageAction extends AnAction {
         });
     }
 
-
     @Override
-    public void beforeActionPerformedUpdate(@NotNull AnActionEvent e) {
+    public void update(@NotNull AnActionEvent e) {
         // 在action执行前更新状态
         Project project = e.getProject();
         Presentation presentation = e.getPresentation();
@@ -340,22 +338,6 @@ public class GenerateCommitMessageAction extends AnAction {
 
     private String buildFinalMessage(String branchName, String content) {
         return branchName + ":" + content;
-    }
-
-    @Override
-    public void update(@NotNull AnActionEvent e) {
-        Project project = e.getProject();
-        Presentation presentation = e.getPresentation();
-        
-        // 根据处理状态设置按钮文本和状态
-        presentation.setText(isProcessing ? PROCESSING_TEXT : DEFAULT_TEXT);
-        presentation.setDescription(isProcessing ? PROCESSING_TEXT : DEFAULT_TEXT);
-        presentation.setIcon(isProcessing ? PROCESSING_ICON : DEFAULT_ICON);
-        presentation.setEnabled(project != null);
-        presentation.setVisible(project != null);
-
-        // 强制刷新UI
-        updateButtonUI(e);
     }
 
     @Override

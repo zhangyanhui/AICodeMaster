@@ -46,6 +46,10 @@ public class ApiKeySettings implements PersistentStateComponent<ApiKeySettings> 
                 i++;
             }
         }
+        if (result == null || result.length == 0) {
+            result = Constants.LLM_CLIENTS;
+        }
+
         return result;
     }
 

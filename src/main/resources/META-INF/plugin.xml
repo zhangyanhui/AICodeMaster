@@ -117,7 +117,15 @@
             <keyboard-shortcut keymap="$default" first-keystroke="alt U"/>
         </action>
 
+        <action id="com.yohannzhang.aigit.action.DiffCodeReviewAction"
+                class="com.yohannzhang.aigit.action.DiffCodeReviewAction"
+                text="AI Code Review"
+                icon="/icons/git-commit-logo.svg"
+                description="Perform AI code review on diff">
+<!--            <add-to-group group-id="Vcs.ChangesViewPopupMenu" anchor="first"/>-->
+            <add-to-group group-id="Diff.EditorPopupMenu" anchor="first"/>
 
+        </action>
 
     </actions>
 

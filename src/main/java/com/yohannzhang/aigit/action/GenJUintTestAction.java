@@ -11,7 +11,7 @@ import com.intellij.openapi.wm.ToolWindowManager;
 import com.yohannzhang.aigit.handler.CommonMessageGenerator;
 import com.yohannzhang.aigit.util.CodeUtil;
 
-public class AddCommentAction extends AnAction {
+public class GenJUintTestAction extends AnAction {
     //    private final CommonMessageGenerator commonMessageGenerator = new CommonMessageGenerator();
     private static final CodeUtil CODE_UTIL = new CodeUtil();
     private static final String RESULT_BOX_TOOL_WINDOW = "AICodeMaster";
@@ -59,11 +59,12 @@ public class AddCommentAction extends AnAction {
     }
 
 
+
     private String buildPrompt(String code) {
-        return "请基于以下 Java 方法生成 JUnit 5 单元测试，并使用 AssertJ 提供的断言方式编写更具可读性的测试逻辑。" +
-                "请覆盖主要业务路径及异常情况。\n\n" +
-                "目标代码如下：\n" + code;
+        return "为以下代码生成单元测试方法，" +
+                "代码如下：" + code;
     }
+
 
 
     private void showWarningDialog(String message) {

@@ -1,8 +1,11 @@
 package com.yohannzhang.aigit.config;
 
 import com.intellij.openapi.options.Configurable;
+import com.intellij.openapi.project.Project;
+import com.intellij.openapi.project.ProjectManager;
 import com.yohannzhang.aigit.constant.Constants;
 import com.yohannzhang.aigit.pojo.PromptInfo;
+import com.yohannzhang.aigit.ui.CombinedWindowFactory;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -35,6 +38,7 @@ public class ApiKeyConfigurable implements Configurable {
     public JComponent createComponent() {
         ui = new ApiKeyConfigurableUI();
         loadSettings();
+        loadUiState(settings.getSelectedClient(),settings.getSelectedModule());
         return ui.getMainPanel();
     }
 
@@ -70,6 +74,28 @@ public class ApiKeyConfigurable implements Configurable {
         }
         // 保存prompt类型
         settings.setPromptType((String) selectedPromptType);
+        //更新输出面板模型的赋值
+        loadUiState(selectedClient, selectedModule);
+
+
+
+    }
+    public void loadUiState(String selectedClient, String selectedModule){
+        //如何获取project
+        Project[] projects = ProjectManager.getInstance().getOpenProjects();
+        if (projects.length > 0) {
+            for (Project project : projects) {
+                // 处理每个 project
+                CombinedWindowFactory combinedWindowFactory = CombinedWindowFactory.getInstance(project);
+                CombinedWindowFactory.UIState uiStateIState = combinedWindowFactory.uiStates.get(project);
+                if(uiStateIState!=null){
+                    uiStateIState.modelComboBox.setSelectedItem(selectedClient);
+                    uiStateIState.modelSelectComboBox.setSelectedItem(selectedModule);
+                }
+
+
+            }
+        }
     }
 
     @Override
