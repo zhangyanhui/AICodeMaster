@@ -18,6 +18,7 @@ import com.yohannzhang.aigit.service.CommitMessageService;
 import com.yohannzhang.aigit.util.GItCommitUtil;
 import com.yohannzhang.aigit.util.IdeaDialogUtil;
 import git4idea.GitLocalBranch;
+import git4idea.repo.GitRepository;
 import git4idea.repo.GitRepositoryManager;
 import org.jetbrains.annotations.NotNull;
 
@@ -28,7 +29,6 @@ import java.util.List;
  * 继承自 AnAction 以集成到 IDEA 的操作系统中
  */
 public class GenerateCommitMessageAction extends AnAction {
-    private static final String RESULT_BOX_TOOL_WINDOW = "AICodeMaster";
 
     /**
      * 获取CommitMessage对象
@@ -39,89 +39,105 @@ public class GenerateCommitMessageAction extends AnAction {
 
     private final StringBuilder messageBuilder = new StringBuilder();
 
-    @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
-
         Project project = e.getProject();
         if (project == null) {
             return;
         }
 
-
-        // 根据配置，创建对应的服务
-        CommitMessageService commitMessageService = new CommitMessageService();
-
-        if (!commitMessageService.checkNecessaryModuleConfigIsRight()) {
-            IdeaDialogUtil.handleModuleNecessaryConfigIsWrong(project);
-            return;
-        }
-
-        AbstractCommitWorkflowHandler<?, ?> commitWorkflowHandler = (AbstractCommitWorkflowHandler<?, ?>) e.getData(
-                VcsDataKeys.COMMIT_WORKFLOW_HANDLER);
-        if (commitWorkflowHandler == null) {
-            IdeaDialogUtil.handleNoChangesSelected(project);
-            return;
-        }
-        // 获取当前分支
-        GitRepositoryManager gitRepositoryManager = GitRepositoryManager.getInstance(project);
-        GitLocalBranch branch = gitRepositoryManager.getRepositories().get(0).getCurrentBranch();
-        CommitMessage commitMessage = getCommitMessage(e);
-
-
-        List<Change> includedChanges = commitWorkflowHandler.getUi().getIncludedChanges();
-        List<FilePath> includedUnversionedFiles = commitWorkflowHandler.getUi().getIncludedUnversionedFiles();
-
-        if (includedChanges.isEmpty() && includedUnversionedFiles.isEmpty()) {
-            commitMessage.setCommitMessage(Constants.NO_FILE_SELECTED);
-            return;
-        }
-
-        commitMessage.setCommitMessage(branch.getName() + ":" + Constants.GENERATING_COMMIT_MESSAGE);
-        String diff = GItCommitUtil.computeDiff(includedChanges, includedUnversionedFiles, project);
-//
-
-        // Run the time-consuming operations in a background task
-        ProgressManager.getInstance().run(new Task.Backgroundable(project, Constants.TASK_TITLE, true) {
-            @Override
-            public void run(@NotNull ProgressIndicator indicator) {
-                try {
-                    System.out.println("diff: " + diff);
-                    if (commitMessageService.generateByStream()) {
-                        messageBuilder.setLength(0);
-                        commitMessageService.generateCommitMessageStream(
-                                diff,
-                                // onNext 处理每个token
-                                token -> ApplicationManager.getApplication().invokeLater(() -> {
-                                    if (messageBuilder.isEmpty()) {
-                                        messageBuilder.append(token);
-                                        commitMessage.setCommitMessage(token);
-                                    } else {
-                                        messageBuilder.append(token);
-                                        commitMessage.setCommitMessage(branch.getName() + ":" + messageBuilder);
-                                    }
-                                }),
-                                // onError 处理错误
-                                error -> ApplicationManager.getApplication().invokeLater(() -> {
-                                    IdeaDialogUtil.showError(project, "Error generating commit message: " + error.getMessage(), "Error");
-                                })
-                        );
-                    } else {
-                        String commitMessageFromAi = commitMessageService.generateCommitMessage(diff).trim();
-                        ApplicationManager.getApplication().invokeLater(() -> {
-                            commitMessage.setCommitMessage(branch.getName() + ":" + commitMessageFromAi);
-                        });
-                    }
-                } catch (IllegalArgumentException ex) {
-                    IdeaDialogUtil.showWarning(project, ex.getMessage() + "\n ----Please check your module config.",
-                            "AI Commit Message Warning");
-                } catch (Exception ex) {
-                    IdeaDialogUtil.showError(project, "Error generating commit message: " + ex.getMessage(), "Error");
-                }
-                // update(e);
-            }
+        // 点击后按钮设置为处理中
+        ApplicationManager.getApplication().invokeLater(() -> {
+            e.getPresentation().setEnabled(false);
+//            ActionManager.getInstance().fireAnActionPropertyChanged(this, e.getPresentation());
         });
+        try {
+            CommitMessageService commitMessageService = new CommitMessageService();
 
+            if (!commitMessageService.checkNecessaryModuleConfigIsRight()) {
+                IdeaDialogUtil.handleModuleNecessaryConfigIsWrong(project);
+                return;
+            }
 
+            AbstractCommitWorkflowHandler<?, ?> commitWorkflowHandler = (AbstractCommitWorkflowHandler<?, ?>) e.getData(
+                    VcsDataKeys.COMMIT_WORKFLOW_HANDLER);
+            if (commitWorkflowHandler == null) {
+                IdeaDialogUtil.handleNoChangesSelected(project);
+                return;
+            }
+
+            GitRepositoryManager gitRepositoryManager = GitRepositoryManager.getInstance(project);
+            List<GitRepository> repositories = gitRepositoryManager.getRepositories();
+            if (repositories.isEmpty()) {
+                IdeaDialogUtil.showWarning(project, "No Git repository found.", "Git Repository Missing");
+                return;
+            }
+            GitLocalBranch branch = repositories.get(0).getCurrentBranch();
+            if (branch == null) {
+                IdeaDialogUtil.showWarning(project, "Current branch is null.", "Git Branch Error");
+                return;
+            }
+
+            CommitMessage commitMessage = getCommitMessage(e);
+
+            List<Change> includedChanges = commitWorkflowHandler.getUi().getIncludedChanges();
+            List<FilePath> includedUnversionedFiles = commitWorkflowHandler.getUi().getIncludedUnversionedFiles();
+
+            if (includedChanges.isEmpty() && includedUnversionedFiles.isEmpty()) {
+                commitMessage.setCommitMessage(Constants.NO_FILE_SELECTED);
+                return;
+            }
+
+            String branchName = branch.getName();
+            if (branchName == null) {
+                branchName = "unknown";
+            }
+
+            commitMessage.setCommitMessage(branchName + ":" + Constants.GENERATING_COMMIT_MESSAGE);
+
+            String diff = GItCommitUtil.computeDiff(includedChanges, includedUnversionedFiles, project);
+
+            String finalBranchName = branchName;
+            ProgressManager.getInstance().run(new Task.Backgroundable(project, Constants.TASK_TITLE, true) {
+                @Override
+                public void run(@NotNull ProgressIndicator indicator) {
+                    StringBuilder messageBuilder = new StringBuilder(); // 避免线程冲突
+
+                    try {
+                        if (commitMessageService.generateByStream()) {
+                            commitMessageService.generateCommitMessageStream(
+                                    diff,
+                                    token -> ApplicationManager.getApplication().invokeLater(() -> {
+                                        messageBuilder.append(token);
+                                        commitMessage.setCommitMessage(buildFinalMessage(finalBranchName, messageBuilder.toString()));
+                                    }),
+                                    error -> ApplicationManager.getApplication().invokeLater(() -> {
+                                        IdeaDialogUtil.showError(project, "Error generating commit message: " + error.getMessage(), "Error");
+                                    })
+                            );
+                        } else {
+                            String commitMessageFromAi = commitMessageService.generateCommitMessage(diff).trim();
+                            ApplicationManager.getApplication().invokeLater(() -> {
+                                commitMessage.setCommitMessage(buildFinalMessage(finalBranchName, commitMessageFromAi));
+                            });
+                        }
+                    } catch (IllegalArgumentException ex) {
+                        IdeaDialogUtil.showWarning(project, ex.getMessage() + "\n ----Please check your module config.",
+                                "AI Commit Message Warning");
+                    } catch (Exception ex) {
+                        IdeaDialogUtil.showError(project, "Error generating commit message: " + ex.getMessage(), "Error");
+                    } finally {
+                        update(e);
+                    }
+                }
+            });
+
+        } finally {
+            getTemplatePresentation().setEnabled(true);
+        }
+    }
+
+    private String buildFinalMessage(String branchName, String content) {
+        return branchName + ":" + content;
     }
 
     @Override

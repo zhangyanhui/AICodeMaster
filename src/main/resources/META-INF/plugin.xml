@@ -101,6 +101,8 @@
 
 
         <!-- Declare the action for manual commit message generation -->
+        <group id="MyCustomCommitActionGroup" text="Custom Commit Actions" popup="true"/>
+
         <action id="AICommitMessage.Generate"
                 class="com.yohannzhang.aigit.action.GenerateCommitMessageAction"
                 text="Generate AI Commit Message"
@@ -108,31 +110,13 @@
                 description="Generate a commit message using AI">
             <add-to-group group-id="Vcs.MessageActionGroup" anchor="first"/>
         </action>
+
         <action id="com.yohannzhang.aigit.action.GenJUintTestAction" class="com.yohannzhang.aigit.action.GenJUintTestAction"
                 text="生成单元测试" description="生成单元测试代码">
             <add-to-group group-id="EditorPopupMenu" anchor="first"/>
             <keyboard-shortcut keymap="$default" first-keystroke="alt U"/>
         </action>
-<!--        <action id="ShowMeYourCodeAction" class="com.yohannzhang.aigit.action.ShowMeYourCodeAction" text="文字生成代码"-->
-<!--                description="根据文字生成代码">-->
-<!--            <add-to-group group-id="EditorPopupMenu" anchor="first"/>-->
-<!--            <keyboard-shortcut keymap="$default" first-keystroke="alt G"/>-->
-<!--        </action>-->
-<!--        <action id="OptimizeCodeAction" class="com.yohannzhang.aigit.action.OptimizeCodeAction" text="优化代码"-->
-<!--                description="根据给出的代码给出相应的优化建议">-->
-<!--            <add-to-group group-id="EditorPopupMenu" anchor="first"/>-->
-<!--            <keyboard-shortcut keymap="$default" first-keystroke="alt O"/>-->
-<!--        </action>-->
-<!--        <action id="AskAnythingAction" class="com.yohannzhang.aigit.action.AskAnythingAction" text="问一些问题"-->
-<!--                description="根据问题作出回答">-->
-<!--            <add-to-group group-id="EditorPopupMenu" anchor="first"/>-->
-<!--            <keyboard-shortcut keymap="$default" first-keystroke="alt A"/>-->
-<!--        </action>-->
-<!--        <action id="GenerateTestClassAction" class="com.yohannzhang.aigit.action.GenerateTestClassAction" text="生成测试代码"-->
-<!--                description="生成测试代码">-->
-<!--            <add-to-group group-id="EditorPopupMenu" anchor="first"/>-->
-<!--            <keyboard-shortcut keymap="$default" first-keystroke="alt A"/>-->
-<!--        </action>-->
+
 
 
     </actions>
