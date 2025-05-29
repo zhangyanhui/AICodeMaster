@@ -55,7 +55,9 @@ public class GenerateCommitMessageAction extends AnAction {
      * 获取CommitMessage对象
      */
     private CommitMessage getCommitMessage(AnActionEvent e) {
-        return (CommitMessage) e.getData(VcsDataKeys.COMMIT_MESSAGE_CONTROL);
+        CommitMessage commitMessage = (CommitMessage) e.getData(VcsDataKeys.COMMIT_MESSAGE_CONTROL);
+
+        return commitMessage;
     }
 
     private void updateButtonUI(AnActionEvent e) {
