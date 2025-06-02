@@ -95,15 +95,7 @@ public class OpenAIUtil {
                 }
             } catch (IOException e) {
                 if (!isCancelled) {
-                    try {
-                        onNext.getClass().getMethod("accept", Object.class).invoke(onNext, e);
-                    } catch (IllegalAccessException ex) {
-                        throw new RuntimeException(ex);
-                    } catch (InvocationTargetException ex) {
-                        throw new RuntimeException(ex);
-                    } catch (NoSuchMethodException ex) {
-                        throw new RuntimeException(ex);
-                    }
+                    onError.accept(e);
                 }
             } finally {
                 // 流结束时触发 onComplete

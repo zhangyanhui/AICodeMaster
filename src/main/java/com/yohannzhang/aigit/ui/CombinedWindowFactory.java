@@ -18,6 +18,7 @@ import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.ui.popup.JBPopupFactory;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.openapi.wm.ToolWindowFactory;
+import com.intellij.ui.AnimatedIcon;
 import com.intellij.ui.DocumentAdapter;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.content.Content;
@@ -42,6 +43,8 @@ import javax.swing.border.TitledBorder;
 import javax.swing.event.DocumentEvent;
 import java.awt.*;
 import java.awt.event.*;
+import java.awt.geom.AffineTransform;
+import java.awt.image.BufferedImage;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
@@ -93,32 +96,15 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         JPanel historyPanel;
         DefaultListModel<HistoryItem> historyListModel;
         private final StringBuilder messageBuilder = new StringBuilder();
-
+        Timer loadingTimer;
+        JPanel loadingPanel;
     }
-
-    // Add new field for chat history
-//    private final StringBuilder chatHistory = new StringBuilder();
-
-//    private final StringBuilder currentQAContent = new StringBuilder();
-
-//    private StringBuilder currentAnswer = new StringBuilder(); // 添加新字段来跟踪当前答案
-
-    // Add field for history panel
-//    private JPanel historyPanel;
-//    private JList<HistoryItem> historyList;
-//    private DefaultListModel<HistoryItem> historyListModel;
-    private boolean isHistoryView = false;
 
     static {
         MutableDataSet options = new MutableDataSet();
         parser = Parser.builder(options).build();
         renderer = HtmlRenderer.builder(options).build();
     }
-
-    /**
-     * 读取 classpath 中的资源文件并返回字符串
-     */
-
 
     @Override
     public void createToolWindowContent(@NotNull Project project, @NotNull ToolWindow toolWindow) {
@@ -183,28 +169,8 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
                 new CustomShortcutSet(KeyStroke.getKeyStroke(KeyEvent.VK_H, InputEvent.CTRL_DOWN_MASK)),
                 panel);
 
-//        // 刷新 UI
-//        ApplicationManager.getApplication().invokeLater(() -> {
-////            refreshUIOnThemeChange(project);
-//            UIState state = uiStates.get(project);
-//            if (state != null && state.questionTextArea != null) {
-//                state.questionTextArea.setForeground(new Color(180, 180, 180));
-//            }
-//        });
-
         instances.put(project, this);
     }
-//    public void showWelcomePage() {
-//        String welcomeHtml = readResourceFile("welcome.html");
-//        markdownViewer.loadHTML(welcomeHtml);
-//        isHistoryView = false; // 确保不在历史视图
-//
-//        // 刷新UI确保显示正确
-//        outputPanel.removeAll();
-//        outputPanel.add(markdownViewer.getComponent(), BorderLayout.CENTER);
-//        outputPanel.revalidate();
-//        outputPanel.repaint();
-//    }
 
     @Override
     public void globalSchemeChange(EditorColorsScheme scheme) {
@@ -372,12 +338,7 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
 //        String welcomeHtml = readResourceFile("empty.html");
         String welcomeHtml = HtmlTemplateReplacer.replaceCssVariables("empty.html", fontSize, ideBackgroundColor, ideFontColor);
 
-
-//        String script = "document.documentElement.style.setProperty('--font-size', '" + fontSize + "px');" +
-//                "document.documentElement.style.setProperty('--workspace-color', '" + toHex(ideBackgroundColor) + "');" +
-//                "document.documentElement.style.setProperty('--idefont-color', '" + toHex(ideFontColor) + "');";
-
-        ApplicationManager.getApplication().invokeLater(() -> {
+       ApplicationManager.getApplication().invokeLater(() -> {
             state.markdownViewer.loadHTML(welcomeHtml);
 //            state.markdownViewer.getCefBrowser().executeJavaScript(script, "about:blank", 0);
         });
@@ -388,105 +349,7 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         return outputPanel;
     }
 
-//    private void toggleHistoryView() {
-//        if (!isHistoryView) {
-//            // 显示历史面板
-//            if (historyPanel == null) {
-//                createHistoryPanel();
-//            }
-//            outputPanel.remove(markdownViewer.getComponent());
-//            outputPanel.add(historyPanel, BorderLayout.CENTER);
-//            updateHistoryList();
-//        } else {
-//            // 显示主内容
-//            outputPanel.remove(historyPanel);
-//            outputPanel.add(markdownViewer.getComponent(), BorderLayout.CENTER);
-//            if (chatHistory.length() == 0) {
 
-    /// /                showWelcomeContent();
-//            }
-//        }
-//        isHistoryView = !isHistoryView;
-//        outputPanel.revalidate();
-//        outputPanel.repaint();
-//    }
-
-
-//    private void createHistoryPanel() {
-//        historyPanel = new JPanel(new BorderLayout());
-//        historyPanel.setBackground(ideBackgroundColor);
-//        historyPanel.setBorder(BorderFactory.createCompoundBorder(
-//                BorderFactory.createLineBorder(new Color(200, 200, 200), 1),
-//                BorderFactory.createEmptyBorder(10, 10, 10, 10)
-//        ));
-//
-//        historyListModel = new DefaultListModel<>();
-//        historyList = new JList<>(historyListModel);
-//        historyList.setBackground(ideBackgroundColor);
-//        historyList.setForeground(ideFontColor);
-//        historyList.setFont(new Font("SansSerif", Font.PLAIN, 14));
-//        historyList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-//        historyList.setFixedCellHeight(60);
-//        historyList.setCellRenderer(new HistoryListCellRenderer());
-//
-//        historyList.addListSelectionListener(e -> {
-//            if (!e.getValueIsAdjusting()) {
-//                int selectedIndex = historyList.getSelectedIndex();
-//                if (selectedIndex != -1) {
-//                    String[] historyItems = chatHistory.toString().split(
-//                            "<hr style='border: none; border-top: 1px solid #ddd; margin: 20px 0;'>"
-//                    );
-//
-//                    if (selectedIndex < historyItems.length) {
-//                        String questionItem = historyItems[selectedIndex];
-//                        String answerItem = (selectedIndex + 1 < historyItems.length) ?
-//                                historyItems[selectedIndex + 1] : "";
-//
-//                        String fullContent = questionItem +
-//                                "<hr style='border: none; border-top: 1px solid #ddd; margin: 20px 0;'>" +
-//                                answerItem;
-//
-//                        updateResult(fullContent);
-//
-//                        if (isHistoryView) {
-//                            toggleHistoryView(pro);
-//                        }
-//                    }
-//                }
-//            }
-//        });
-//
-//        JScrollPane listScrollPane = new JBScrollPane(historyList);
-//        listScrollPane.setBorder(BorderFactory.createEmptyBorder());
-//        historyPanel.add(listScrollPane, BorderLayout.CENTER);
-//    }
-//
-//    private void updateHistoryList() {
-//        historyListModel.clear();
-//        String[] historyItems = chatHistory.toString().split("<hr style='border: none; border-top: 1px solid #ddd; margin: 20px 0;'>");
-//
-//        for (String item : historyItems) {
-//            if (!item.trim().isEmpty()) {
-//                // 提取问题和时间戳
-//                int qStart = item.indexOf("<strong style='color: #4CAF50;'>Q:</strong>");
-//                if (qStart != -1) {
-//                    int qEnd = item.indexOf("</div>", qStart);
-//                    if (qEnd != -1) {
-//                        String question = item.substring(qStart + 40, qEnd).trim();
-//                        String timestamp = "";
-//                        int timeStart = item.indexOf("<span style='color: #666; font-size: 0.9em;'>");
-//                        if (timeStart != -1) {
-//                            int timeEnd = item.indexOf("</span>", timeStart);
-//                            if (timeEnd != -1) {
-//                                timestamp = item.substring(timeStart + 45, timeEnd);
-//                            }
-//                        }
-//                        historyListModel.addElement(new HistoryItem(question, timestamp));
-//                    }
-//                }
-//            }
-//        }
-//    }
 
     private static class HistoryItem {
         private final String question;
@@ -551,18 +414,6 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         UIState state = getOrCreateState(project);
         JPanel inputPanel = new JPanel(new BorderLayout(1, 1)); // 调整整体组件间距为 5
         inputPanel.setBackground(ideBackgroundColor);
-//        inputPanel.setBorder(BorderFactory.createCompoundBorder(
-//                BorderFactory.createLineBorder(new Color(231, 76, 60), 1),
-//                BorderFactory.createEmptyBorder(6, 16, 6, 16)));
-
-//        inputPanel.setBorder(BorderFactory.createTitledBorder(
-//                BorderFactory.createLineBorder(new Color(200, 200, 200), 1),
-//                "",
-//                TitledBorder.LEFT,
-//                TitledBorder.TOP,
-//                new Font("SansSerif", Font.BOLD, 14),
-//                new Color(76, 175, 80) // 使用柔和的绿色突出标题
-//        ));
 
         String[] clientArr = ApiKeySettings.getInstance().getAvailableModels();
         JComboBox<String> modelComboBox = new JComboBox<>(clientArr);
@@ -711,74 +562,7 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
 
 
     }
-    private int findWordStart(String input, int caretPos) {
-        int pos = caretPos;
-        while (pos > 0 && Character.isLetterOrDigit(input.charAt(pos - 1))) {
-            pos--;
-        }
-        return pos;
-    }
 
-    private void showNaturalLanguageSuggestions(Project project, JTextArea textArea) {
-        int caretPos = textArea.getCaretPosition();
-        if (caretPos == 0) return;
-
-        String input = textArea.getText().substring(0, caretPos);
-        int wordStart = findWordStart(input, caretPos);
-
-        String prefix = input.substring(wordStart, caretPos);
-
-        java.util.List<String> mockSuggestions = Arrays.asList(
-                "如何编写Java类",
-                "如何优化代码性能",
-                "帮我写一个冒泡排序",
-                "如何使用Git提交代码",
-                "解释下HashMap的工作原理"
-        );
-
-        List<String> matched = mockSuggestions.stream()
-                .filter(s -> s.toLowerCase().startsWith(prefix.toLowerCase()))
-                .toList();
-
-        if (!matched.isEmpty()) {
-            JBPopupFactory factory = JBPopupFactory.getInstance();
-            JList<String> list = new JList<>(new DefaultListModel<>());
-            DefaultListModel<String> model = (DefaultListModel<String>) list.getModel();
-            matched.forEach(model::addElement);
-
-            list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-            list.setCellRenderer(new DefaultListCellRenderer() {
-                @Override
-                public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
-                    JLabel label = (JLabel) super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
-                    label.setBackground(isSelected ? UIManager.getColor("List.selectionBackground") : UIManager.getColor("List.background"));
-                    label.setForeground(isSelected ? UIManager.getColor("List.selectionForeground") : UIManager.getColor("List.foreground"));
-                    return label;
-                }
-            });
-
-            list.addMouseListener(new MouseAdapter() {
-                @Override
-                public void mouseClicked(MouseEvent e) {
-                    if (e.getClickCount() == 1) {
-                        String selected = list.getSelectedValue();
-                        if (selected != null) {
-                            textArea.setText(textArea.getText().substring(0, wordStart) + selected);
-                            textArea.setCaretPosition(textArea.getText().length());
-                        }
-                    }
-                }
-            });
-
-            JScrollPane scrollPane = new JBScrollPane(list);
-            factory.createComponentPopupBuilder(scrollPane, null)
-                    .setRequestFocus(true)
-                    .setTitle("建议")
-                    .setDimensionServiceKey(null, "NaturalLanguageSuggestionPopup", true)
-                    .createPopup()
-                    .showInCenterOf(textArea);
-        }
-    }
 
     private JButton createStyledButton(String text) {
         JButton button = new JButton(text);
@@ -951,7 +735,7 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         }
     }
 
-//     在类中添加ProjectManagerListener
+    //     在类中添加ProjectManagerListener
     private final ProjectManagerListener projectListener = new ProjectManagerListener() {
         @Override
         public void projectClosed(@NotNull Project project) {
@@ -1002,10 +786,6 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         // 构造函数保持简单
     }
 
-    // 添加一个方法来检查实例是否有效
-    public boolean isValid() {
-        return !isDisposed && currentProject != null && !currentProject.isDisposed();
-    }
 
     public void dispose() {
         if (isDisposed) return;
@@ -1032,5 +812,229 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         }
         // 可选：清理其他组件资源
     }
+
+    private static class LoadingDots extends JPanel {
+        private static final int DOT_COUNT = 3;
+        private static final int DOT_SIZE = 8;
+        private static final int DOT_SPACING = 12;
+        private static final Color DOT_COLOR = new Color(76, 175, 80);
+        private int currentDot = 0;
+        private final Timer timer;
+
+        public LoadingDots() {
+            setOpaque(false);
+            setPreferredSize(new Dimension(DOT_COUNT * (DOT_SIZE + DOT_SPACING), DOT_SIZE + 10));
+            
+            timer = new Timer(300, e -> {
+                currentDot = (currentDot + 1) % DOT_COUNT;
+                repaint();
+            });
+            timer.start();
+        }
+
+        public void stop() {
+            timer.stop();
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            Graphics2D g2d = (Graphics2D) g.create();
+            
+            // 启用抗锯齿
+            g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            
+            int centerY = getHeight() / 2;
+            
+            for (int i = 0; i < DOT_COUNT; i++) {
+                int x = i * (DOT_SIZE + DOT_SPACING) + DOT_SPACING;
+                float alpha = i == currentDot ? 1.0f : 0.3f;
+                g2d.setColor(new Color(
+                    DOT_COLOR.getRed(),
+                    DOT_COLOR.getGreen(),
+                    DOT_COLOR.getBlue(),
+                    (int)(alpha * 255)
+                ));
+                g2d.fillOval(x, centerY - DOT_SIZE/2, DOT_SIZE, DOT_SIZE);
+            }
+            
+            g2d.dispose();
+        }
+    }
+
+    public void startLoadingAnimation(Project project) {
+        UIState state = uiStates.get(project);
+        if (state != null && state.outputPanel != null) {
+            updateResult("",project);
+            // 创建加载面板
+            JPanel loadingPanel = new JPanel(new BorderLayout());
+            loadingPanel.setBackground(ideBackgroundColor);
+            
+            // 创建动画面板
+            JPanel animationPanel = new JPanel(new BorderLayout(15, 0)); // 将垂直间距改为0
+            animationPanel.setBackground(ideBackgroundColor);
+            animationPanel.setBorder(BorderFactory.createEmptyBorder(30, 30, 30, 30));
+            
+            // 创建加载动画面板
+            JPanel loadingAnimationPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 0));
+            loadingAnimationPanel.setBackground(ideBackgroundColor);
+            LoadingDots loadingDots = new LoadingDots();
+            loadingAnimationPanel.add(loadingDots);
+            
+            // 提示文本面板
+            JPanel textPanel = new JPanel(new GridLayout(2, 1, 0, 8));
+            textPanel.setBackground(ideBackgroundColor);
+            textPanel.setBorder(BorderFactory.createEmptyBorder(2, 0, 0, 0)); // 将上边距改为2
+            
+            JLabel titleLabel = new JLabel("正在生成项目文档，" +
+                    "请稍候...");
+            titleLabel.setHorizontalAlignment(SwingConstants.CENTER);
+            titleLabel.setForeground(new Color(33, 33, 33));
+            titleLabel.setFont(new Font("SansSerif", Font.BOLD, 18));
+            
+//            JLabel subtitleLabel = new JLabel("请稍候，这可能需要一点时间...");
+//            subtitleLabel.setHorizontalAlignment(SwingConstants.CENTER);
+//            subtitleLabel.setForeground(new Color(128, 128, 128));
+//            subtitleLabel.setFont(new Font("SansSerif", Font.PLAIN, 14));
+            
+            textPanel.add(titleLabel);
+//            textPanel.add(subtitleLabel);
+            
+            // 组装组件
+            animationPanel.add(loadingAnimationPanel, BorderLayout.NORTH);
+            animationPanel.add(textPanel, BorderLayout.CENTER);
+            
+            loadingPanel.add(animationPanel, BorderLayout.CENTER);
+            
+            // 替换输出面板内容
+            state.outputPanel.removeAll();
+            state.outputPanel.add(loadingPanel, BorderLayout.CENTER);
+            state.outputPanel.revalidate();
+            state.outputPanel.repaint();
+            
+            // 保存引用
+            state.loadingPanel = loadingPanel;
+            state.loadingTimer = null;
+        }
+    }
+
+    public void stopLoadingAnimation(Project project) {
+        UIState state = uiStates.get(project);
+        if (state != null && state.outputPanel != null) {
+            // 停止动画
+            Component[] components = state.loadingPanel.getComponents();
+            if (components.length > 0 && components[0] instanceof JPanel) {
+                JPanel animationPanel = (JPanel) components[0];
+                Component[] animationComponents = animationPanel.getComponents();
+                for (Component comp : animationComponents) {
+                    if (comp instanceof JPanel) {
+                        JPanel loadingAnimationPanel = (JPanel) comp;
+                        Component[] loadingComponents = loadingAnimationPanel.getComponents();
+                        for (Component loadingComp : loadingComponents) {
+                            if (loadingComp instanceof LoadingDots) {
+                                ((LoadingDots) loadingComp).stop();
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // 淡出动画
+            Timer fadeOutTimer = new Timer(50, new ActionListener() {
+                private float opacity = 1.0f;
+                
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    opacity -= 0.1f;
+                    if (opacity <= 0) {
+                        ((Timer)e.getSource()).stop();
+                        state.outputPanel.removeAll();
+                        state.outputPanel.add(state.markdownViewer.getComponent(), BorderLayout.CENTER);
+                        state.outputPanel.revalidate();
+                        state.outputPanel.repaint();
+                        state.loadingPanel = null;
+                    } else {
+                        state.outputPanel.setBackground(new Color(
+                            ideBackgroundColor.getRed(),
+                            ideBackgroundColor.getGreen(),
+                            ideBackgroundColor.getBlue(),
+                            (int)(opacity * 255)
+                        ));
+                        state.outputPanel.repaint();
+                    }
+                }
+            });
+            fadeOutTimer.start();
+        }
+    }
+
+
+    public void updateLoadingProgress(Project project, String message) {
+        UIState state = uiStates.get(project);
+        if (state != null && state.loadingPanel != null) {
+            // 更新进度条文本
+            Component[] components = state.loadingPanel.getComponents();
+            if (components.length > 0 && components[0] instanceof JPanel) {
+                JPanel animationPanel = (JPanel) components[0];
+                Component[] animationComponents = animationPanel.getComponents();
+                for (Component comp : animationComponents) {
+                    if (comp instanceof JPanel) {
+                        JPanel progressContainer = (JPanel) comp;
+                        Component[] progressComponents = progressContainer.getComponents();
+                        for (Component progressComp : progressComponents) {
+                            if (progressComp instanceof JProgressBar) {
+                                JProgressBar progressBar = (JProgressBar) progressComp;
+                                progressBar.setString(message);
+                                progressBar.setIndeterminate(true);
+                                progressBar.setEnabled(true);
+                                progressBar.setVisible(true);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            state.outputPanel.revalidate();
+            state.outputPanel.repaint();
+        }
+    }
+
+//    public void stopLoadingAnimation(Project project) {
+//        UIState state = uiStates.get(project);
+//        if (state != null && state.outputPanel != null) {
+//            // 停止并清理定时器
+//            if (state.loadingTimer != null) {
+//                state.loadingTimer.stop();
+//                state.loadingTimer = null;
+//            }
+//
+//            // 添加淡出效果
+//            Timer fadeTimer = new Timer(50, new ActionListener() {
+//                private float opacity = 1.0f;
+//
+//                @Override
+//                public void actionPerformed(ActionEvent e) {
+//                    opacity -= 0.1f;
+//                    if (opacity <= 0) {
+//                        ((Timer)e.getSource()).stop();
+//                        state.outputPanel.removeAll();
+//                        state.outputPanel.add(state.markdownViewer.getComponent(), BorderLayout.CENTER);
+//                        state.outputPanel.revalidate();
+//                        state.outputPanel.repaint();
+//                        state.loadingPanel = null;
+//                    } else {
+//                        state.outputPanel.setBackground(new Color(
+//                            ideBackgroundColor.getRed(),
+//                            ideBackgroundColor.getGreen(),
+//                            ideBackgroundColor.getBlue(),
+//                            (int)(opacity * 255)
+//                        ));
+//                        state.outputPanel.repaint();
+//                    }
+//                }
+//            });
+//            fadeTimer.start();
+//        }
+//    }
 
 }

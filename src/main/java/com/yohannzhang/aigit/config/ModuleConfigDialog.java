@@ -211,9 +211,11 @@ public class ModuleConfigDialog extends DialogWrapper {
     protected void doOKAction() {
         ApiKeySettings settings = ApiKeySettings.getInstance();
         String configKey = client;
-        ApiKeySettings.ModuleConfig moduleConfig = settings.getModuleConfigs()
-                .computeIfAbsent(configKey, k -> new ApiKeySettings.ModuleConfig());
-
+        ApiKeySettings.ModuleConfig moduleConfigMap = settings.getModuleConfigs()
+                .computeIfAbsent(configKey, k -> {
+                    ApiKeySettings.ModuleConfig defaultConfig = Constants.moduleConfigs.get(configKey);
+                    return new ApiKeySettings.ModuleConfig(defaultConfig.getUrl(), defaultConfig.getApiKey());
+                });
         String url = urlField.getText().trim();
         String apiKey = new String(apiKeyField.getPassword());
         if (StringUtils.isEmpty(url)) {
@@ -228,8 +230,8 @@ public class ModuleConfigDialog extends DialogWrapper {
             }
         }
 
-        moduleConfig.setApiKey(apiKey);
-        moduleConfig.setUrl(url);
+        moduleConfigMap.setApiKey(apiKey);
+        moduleConfigMap.setUrl(url);
 
         super.doOKAction();
     }

@@ -233,6 +233,7 @@ public class CodeActionGutterIconRenderer extends GutterIconRenderer {
         if (selectedText == null || selectedText.trim().isEmpty()) {
             return;
         }
+
         ToolWindow toolWindow = ToolWindowManager.getInstance(project).getToolWindow(RESULT_BOX_TOOL_WINDOW);
         if (toolWindow == null) {
             return;

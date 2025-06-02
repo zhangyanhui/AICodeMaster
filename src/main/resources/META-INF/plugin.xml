@@ -70,6 +70,8 @@
     <depends optional="true" config-file="lang.xml">com.intellij.modules.lang</depends>
     <depends optional="true" config-file="vcs.xml">com.intellij.modules.vcs</depends>
     <depends optional="true" config-file="git4idea.xml">Git4Idea</depends>
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.java</depends>
 
 
     <extensions defaultExtensionNs="com.intellij">
@@ -122,10 +124,42 @@
                 text="AI Code Review"
                 icon="/icons/git-commit-logo.svg"
                 description="Perform AI code review on diff">
-<!--            <add-to-group group-id="Vcs.ChangesViewPopupMenu" anchor="first"/>-->
             <add-to-group group-id="Diff.EditorPopupMenu" anchor="first"/>
-
         </action>
+
+        <group id="com.yohannzhang.aigit.action.EnhancedDocGenerationAction"
+                class="com.yohannzhang.aigit.action.EnhancedDocGenerationAction"
+                text="生成文档"
+                description="生成项目文档、API文档、UML图表、依赖关系图和中英双语文档"
+                popup="true"
+                icon="/icons/git-commit-logo.svg">
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="first"/>
+        </group>
+
+        <action id="com.yohannzhang.aigit.action.GenerateProjectDocAction"
+                class="com.yohannzhang.aigit.action.GenerateProjectDocAction"
+                text="项目文档"
+                description="生成项目的详细文档"/>
+
+        <action id="com.yohannzhang.aigit.action.GenerateApiDocAction"
+                class="com.yohannzhang.aigit.action.GenerateApiDocAction"
+                text="API 文档"
+                description="生成 API 接口文档"/>
+
+        <action id="com.yohannzhang.aigit.action.GenerateUmlDiagramAction"
+                class="com.yohannzhang.aigit.action.GenerateUmlDiagramAction"
+                text="UML 图表"
+                description="生成 UML 类图"/>
+
+        <action id="com.yohannzhang.aigit.action.GenerateDependencyGraphAction"
+                class="com.yohannzhang.aigit.action.GenerateDependencyGraphAction"
+                text="依赖关系图"
+                description="生成项目依赖关系图"/>
+
+        <action id="com.yohannzhang.aigit.action.GenerateBilingualDocAction"
+                class="com.yohannzhang.aigit.action.GenerateBilingualDocAction"
+                text="中英双语文档"
+                description="生成中英双语项目文档"/>
 
     </actions>
 
