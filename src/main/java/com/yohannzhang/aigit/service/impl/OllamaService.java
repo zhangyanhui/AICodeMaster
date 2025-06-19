@@ -223,13 +223,17 @@ public class OllamaService implements AIService {
                             //拼接响应结果
                             fullResponse.append(response);
                             //判断响应结果中是否包含<think>内容</think>,如只包含<think>则跳过，若包含</think>,则取</think>之后的内容返回
-                            if(fullResponse.toString().contains("<think>")&&!fullResponse.toString().contains("</think>")){
+                            if (fullResponse.toString().contains("<think>") && !fullResponse.toString().contains("</think>")) {
                                 continue;
                             }
-                          System.out.println("==="+fullResponse);
+
+//                          System.out.println("==="+fullResponse);
 
 
                             if (!response.isEmpty()) {
+                                if(response.contains("</think>")){
+                                    response = response.replaceAll("</think>","");
+                                }
                                 onNext.accept(response);
                             }
                         }
@@ -253,4 +257,9 @@ public class OllamaService implements AIService {
     // String s = ollamaService.generateCommitMessage("你如何看待节假日调休这件事情？");
     // System.out.println(s);
     // }
+    public static void main(String[] args) {
+        String response = "--</think>";
+        response = response.substring(response.indexOf("</think>")+7,response.length()).trim();
+        System.out.println("====="+response);
+    }
 }

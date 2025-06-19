@@ -21,3 +21,4 @@ gradle-app.setting
 .classpath
 /bin/
 /.lingma/
+/rag_results/

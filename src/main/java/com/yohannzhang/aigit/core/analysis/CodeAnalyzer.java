@@ -89,4 +89,11 @@ public interface CodeAnalyzer {
      * @return 代码结构指标
      */
     Map<String, Object> analyzeCodeStructure(String code, String language);
+
+    /**
+     * 生成代码质量报告
+     * @param project 项目对象
+     * @return 代码质量报告
+     */
+    Map<String, Object> generateCodeQualityReport(Project project);
 } 

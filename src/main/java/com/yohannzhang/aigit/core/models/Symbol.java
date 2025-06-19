@@ -9,22 +9,23 @@ public class Symbol {
     private final int startLine;
     private final int endLine;
     private final List<String> modifiers;
-    private final Map<String, String> attributes;
+    private final Map<String, Object> attributes;
     private final String documentation;
     private final List<String> references;
+    private String content;
 
     public Symbol(String name, String type, String visibility, int startLine, int endLine,
-                 List<String> modifiers, Map<String, String> attributes,
+                 List<String> modifiers, Map<String, Object> attributes,
                  String documentation, List<String> references) {
         this.name = name;
         this.type = type;
         this.visibility = visibility;
         this.startLine = startLine;
         this.endLine = endLine;
-        this.modifiers = new ArrayList<>(modifiers);
-        this.attributes = new HashMap<>(attributes);
+        this.modifiers = modifiers;
+        this.attributes = attributes;
         this.documentation = documentation;
-        this.references = new ArrayList<>(references);
+        this.references = references;
     }
 
     public String getName() {
@@ -48,11 +49,11 @@ public class Symbol {
     }
 
     public List<String> getModifiers() {
-        return Collections.unmodifiableList(modifiers);
+        return modifiers;
     }
 
-    public Map<String, String> getAttributes() {
-        return Collections.unmodifiableMap(attributes);
+    public Map<String, Object> getAttributes() {
+        return attributes;
     }
 
     public String getDocumentation() {
@@ -60,7 +61,15 @@ public class Symbol {
     }
 
     public List<String> getReferences() {
-        return Collections.unmodifiableList(references);
+        return references;
+    }
+
+    public String getContent() {
+        return content;
+    }
+
+    public void setContent(String content) {
+        this.content = content;
     }
 
     public void addReference(String reference) {

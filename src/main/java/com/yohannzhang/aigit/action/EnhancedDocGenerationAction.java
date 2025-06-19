@@ -9,8 +9,8 @@ public class EnhancedDocGenerationAction extends DefaultActionGroup {
     public EnhancedDocGenerationAction() {
         super("生成文档", true);
         add(new GenerateProjectDocAction());
-        add(new GenerateApiDocAction());
-        add(new GenerateUmlDiagramAction());
+//        add(new GenerateApiDocAction());
+//        add(new GenerateUmlDiagramAction());
         add(new GenerateDependencyGraphAction());
         add(new GenerateBilingualDocAction());
     }

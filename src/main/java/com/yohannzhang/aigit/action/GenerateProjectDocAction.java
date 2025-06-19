@@ -2,62 +2,46 @@ package com.yohannzhang.aigit.action;
 
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.wm.ToolWindow;
-import com.intellij.openapi.wm.ToolWindowManager;
-import com.yohannzhang.aigit.config.ApiKeySettings;
-import com.yohannzhang.aigit.constant.Constants;
-import com.yohannzhang.aigit.core.analysis.BaseCodeAnalyzer;
-import com.yohannzhang.aigit.core.llm.LLMEngine;
-import com.yohannzhang.aigit.core.llm.LLMEngineFactory;
-import com.yohannzhang.aigit.service.AnalysisService;
-import com.yohannzhang.aigit.ui.CombinedWindowFactory;
-import com.yohannzhang.aigit.util.ModuleConfigUtil;
-import com.yohannzhang.aigit.core.llm.LLMEngine.StreamCallback;
-import org.jetbrains.annotations.NotNull;
-import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.progress.ProgressManager;
-import com.intellij.openapi.progress.Task;
-import com.intellij.openapi.progress.ProgressIndicator;
-import com.intellij.openapi.progress.ProcessCanceledException;
+import com.intellij.openapi.ui.Messages;
+import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileManager;
-import com.intellij.openapi.vfs.LocalFileSystem;
+import com.intellij.openapi.wm.ToolWindow;
+import com.intellij.openapi.wm.ToolWindowManager;
+import com.intellij.psi.*;
+import com.intellij.psi.search.GlobalSearchScope;
+import com.intellij.psi.util.PsiTreeUtil;
+import com.yohannzhang.aigit.ui.CombinedWindowFactory;
+import org.jetbrains.annotations.NotNull;
 
-import javax.swing.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.*;
 
 public class GenerateProjectDocAction extends AnAction {
     private static final String RESULT_BOX_TOOL_WINDOW = "AICodeMaster";
-    private final AtomicBoolean isCancelled = new AtomicBoolean(false);
-    private AnalysisService analysisService;
+    private static final String FEIGN_CLIENT_ANNOTATION = "org.springframework.cloud.openfeign.FeignClient";
+    private static final String POST_MAPPING = "org.springframework.web.bind.annotation.PostMapping";
+    private static final String GET_MAPPING = "org.springframework.web.bind.annotation.GetMapping";
 
     public GenerateProjectDocAction() {
-        super("项目文档");
+        super("生成API文档");
     }
 
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
-        Project project = e.getProject();
-        if (project == null) return;
+        Project project = e.getData(CommonDataKeys.PROJECT);
+        if (project == null) {
+            Messages.showErrorDialog("未找到项目", "错误");
+            return;
+        }
 
-        // 重置取消状态
-        isCancelled.set(false);
-
-        // Show tool window and start loading
+        // Show tool window
         ToolWindow toolWindow = ToolWindowManager.getInstance(project).getToolWindow(RESULT_BOX_TOOL_WINDOW);
         if (toolWindow != null) {
             toolWindow.show();
@@ -65,299 +49,447 @@ public class GenerateProjectDocAction extends AnAction {
 
         CombinedWindowFactory windowFactory = CombinedWindowFactory.getInstance(project);
         windowFactory.startLoadingAnimation(project);
-//        windowFactory.updateResult("正在准备生成项目文档...\n", project);
 
-        // 获取项目根目录
-        String projectPath = project.getBasePath();
-        if (projectPath == null) {
-            windowFactory.stopLoadingAnimation(project);
-            windowFactory.updateResult("无法获取项目路径", project);
-            return;
-        }
-
-        // 获取选中的 LLM 客户端
-        ApiKeySettings settings = ApiKeySettings.getInstance();
-        ApiKeySettings.ModuleConfig moduleConfig = settings.getModuleConfigs().get(settings.getSelectedClient());
-
-        String selectedClient = settings.getSelectedClient();
-        if (selectedClient == null) {
-            windowFactory.stopLoadingAnimation(project);
-            windowFactory.updateResult("请先选择一个 LLM 客户端", project);
-            return;
-        }
-
-        if (moduleConfig == null) {
-            windowFactory.stopLoadingAnimation(project);
-            windowFactory.updateResult("未找到模块配置", project);
-            return;
-        }
-
-        // 创建 LLM 引擎
-        LLMEngine llmEngine = LLMEngineFactory.createEngine(selectedClient, moduleConfig);
-        if (llmEngine == null) {
-            windowFactory.stopLoadingAnimation(project);
-            windowFactory.updateResult("创建 LLM 引擎失败", project);
-            return;
-        }
-
-        // 创建代码分析器
-        BaseCodeAnalyzer codeAnalyzer = new BaseCodeAnalyzer();
-
-        // 创建分析服务
-        analysisService = new AnalysisService(codeAnalyzer, llmEngine);
-
-        // 收集项目文件
-        List<String> projectFiles = collectProjectFiles(new File(projectPath));
-
-        // 创建文档输出目录
-        String docDir = projectPath + File.separator + "docs";
         try {
-            Files.createDirectories(Paths.get(docDir));
-        } catch (IOException ex) {
+            // 获取项目根目录
+            String projectPath = project.getBasePath();
+            if (projectPath == null) {
+                windowFactory.stopLoadingAnimation(project);
+                windowFactory.updateResult("无法获取项目路径", project);
+                return;
+            }
+
+            // 创建文档目录
+            String docDir = projectPath + File.separator + "docs";
+            try {
+                Files.createDirectories(Paths.get(docDir));
+            } catch (IOException ex) {
+                windowFactory.stopLoadingAnimation(project);
+                windowFactory.updateResult("创建文档目录失败: " + ex.getMessage(), project);
+                return;
+            }
+
+            // 生成文档文件名
+            String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+            String docFile = docDir + File.separator + "API文档_" + timestamp + ".json";
+
+            // 扫描所有FeignClient接口中的Mapping注解
+            List<Map<String, Object>> apiDocs = scanControllerMappings(project);
+
+            if (apiDocs.isEmpty()) {
+                windowFactory.stopLoadingAnimation(project);
+                windowFactory.updateResult("未找到任何API接口，请确保项目中包含带有@FeignClient注解的接口", project);
+                return;
+            }
+
+            // 生成JSON文档
+            String jsonContent = generateJsonDocument(apiDocs);
+
+            // 保存文档
+            try (FileWriter writer = new FileWriter(docFile)) {
+                writer.write(jsonContent);
+            }
+
+            // 获取相对路径
+            String relativePath = new File(docFile).getAbsolutePath()
+                    .replace(project.getBasePath(), "")
+                    .replaceFirst("^[/\\\\]", "");
+
+            // 构建成功信息
+            String successMessage = String.format(
+                    "<div style='padding: 15px; background-color: #e8f5e9; border-left: 4px solid #4caf50; margin: 10px 0;'>" +
+                            "<h3 style='color: #2e7d32; margin-top: 0;'>✨ API文档生成成功</h3>" +
+                            "<p style='margin: 5px 0;'><strong>📁 保存位置：</strong><code style='background: #f5f5f5; padding: 2px 4px; border-radius: 3px;'>%s</code></p>" +
+                            "<p style='margin: 5px 0;'><strong>📝 文件大小：</strong>%.2f KB</p>" +
+                            "<p style='margin: 5px 0;'><strong>⏱️ 生成时间：</strong>%s</p>" +
+                            "<p style='margin: 5px 0;'><strong>🔍 扫描结果：</strong>共发现 %d 个API接口</p>" +
+                            "<p style='margin: 5px 0;'><strong>💡 提示：</strong>您可以在项目目录的 docs 文件夹中找到生成的文档</p>" +
+                            "</div>",
+                    relativePath,
+                    new File(docFile).length() / 1024.0,
+                    LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")),
+                    apiDocs.size()
+            );
+
             windowFactory.stopLoadingAnimation(project);
-            windowFactory.updateResult("创建文档目录失败: " + ex.getMessage(), project);
-            return;
+            windowFactory.updateResult(successMessage, project);
+
+            // 刷新文件系统以显示新文件
+            VirtualFileManager.getInstance().refreshWithoutFileWatcher(true);
+            VirtualFile docDirFile = LocalFileSystem.getInstance().refreshAndFindFileByPath(docDir);
+            if (docDirFile != null) {
+                docDirFile.refresh(false, false);
+            }
+
+        } catch (Exception ex) {
+            windowFactory.stopLoadingAnimation(project);
+            windowFactory.updateResult("Error: " + ex.getMessage(), project);
         }
+    }
 
-        // 生成文档文件名
-        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
-        String docFile = docDir + File.separator + "项目文档_" + timestamp + ".md";
+    private List<Map<String, Object>> scanControllerMappings(Project project) {
+        List<Map<String, Object>> apiDocs = new ArrayList<>();
+        StringBuilder debugInfo = new StringBuilder();
+        debugInfo.append("开始扫描FeignClient接口...\n");
+        
+        // 检查项目类型和依赖
+        debugInfo.append("检查项目配置...\n");
+        VirtualFile buildFile = findBuildFile(project);
+        if (buildFile != null) {
+            debugInfo.append("找到构建文件: ").append(buildFile.getPath()).append("\n");
+            checkDependencies(buildFile, debugInfo);
+        } else {
+            debugInfo.append("未找到构建文件\n");
+        }
+        
+        // 使用JavaPsiFacade查找所有带有@FeignClient注解的类
+        JavaPsiFacade javaPsiFacade = JavaPsiFacade.getInstance(project);
+        GlobalSearchScope scope = GlobalSearchScope.projectScope(project);
+        
+        // 尝试不同的注解名称
+        String[] possibleAnnotations = {
+            FEIGN_CLIENT_ANNOTATION,
+            "FeignClient",
+            "org.springframework.cloud.openfeign.FeignClient",
+            "org.springframework.cloud.netflix.feign.FeignClient"
+        };
+        
+        Collection<PsiClass> feignInterfaces = new ArrayList<>();
+        
+        for (String annotationName : possibleAnnotations) {
+            debugInfo.append("\n尝试查找注解: ").append(annotationName).append("\n");
+            PsiClass[] classes = javaPsiFacade.findClasses(annotationName, scope);
+            debugInfo.append("找到的类数量: ").append(classes.length).append("\n");
+            
+            for (PsiClass psiClass : classes) {
+                debugInfo.append("检查类: ").append(psiClass.getName())
+                        .append(" (是否接口: ").append(psiClass.isInterface())
+                        .append(", 注解数量: ").append(psiClass.getAnnotations().length)
+                        .append(")\n");
+                
+                // 打印所有注解
+                for (PsiAnnotation annotation : psiClass.getAnnotations()) {
+                    String qualifiedName = annotation.getQualifiedName();
+                    debugInfo.append("  注解: ").append(qualifiedName).append("\n");
+                }
+                
+                if (psiClass.isInterface()) {
+                    feignInterfaces.add(psiClass);
+                    debugInfo.append("  添加Feign接口: ").append(psiClass.getName()).append("\n");
+                }
+            }
+        }
+        
+        // 如果上面的方法没有找到，尝试直接扫描文件
+        if (feignInterfaces.isEmpty()) {
+            debugInfo.append("\n尝试直接扫描文件...\n");
+            scanJavaFiles(project.getBaseDir(), feignInterfaces, project, debugInfo);
+        }
+        
+        debugInfo.append("\n找到的FeignClient接口数量: ").append(feignInterfaces.size()).append("\n");
+        
+        // 处理找到的FeignClient接口
+        for (PsiClass feignInterface : feignInterfaces) {
+            debugInfo.append("\n处理FeignClient接口: ").append(feignInterface.getName()).append("\n");
+            
+            // 获取FeignClient的name/value属性作为基础路径
+            String basePath = getFeignClientPath(feignInterface);
+            debugInfo.append("  - 基础路径: ").append(basePath).append("\n");
+            
+            // 扫描接口中的所有方法
+            for (PsiMethod method : feignInterface.getMethods()) {
+                Map<String, Object> apiDoc = scanMethodMapping(method, basePath);
+                if (apiDoc != null) {
+                    debugInfo.append("  - 找到API方法: ").append(method.getName())
+                            .append(" (").append(apiDoc.get("method")).append(" ")
+                            .append(apiDoc.get("url")).append(")\n");
+                    apiDocs.add(apiDoc);
+                }
+            }
+        }
+        
+        debugInfo.append("\n最终找到的API接口数量: ").append(apiDocs.size()).append("\n");
+        
+        // 显示调试信息
+        CombinedWindowFactory.getInstance(project).updateResult(debugInfo.toString(), project);
+        
+        return apiDocs;
+    }
 
-        // 生成项目文档
-        AtomicReference<StringBuilder> content = new AtomicReference<>(new StringBuilder());
+    private VirtualFile findBuildFile(Project project) {
+        VirtualFile rootDir = project.getBaseDir();
+        VirtualFile[] children = rootDir.getChildren();
+        
+        // 首先查找build.gradle
+        for (VirtualFile file : children) {
+            if (file.getName().equals("build.gradle")) {
+                return file;
+            }
+        }
+        
+        // 然后查找build.gradle.kts
+        for (VirtualFile file : children) {
+            if (file.getName().equals("build.gradle.kts")) {
+                return file;
+            }
+        }
+        
+        return null;
+    }
 
-        String promt = buildPromt(projectFiles);
-        System.out.println("生成项目文档的promt:"+promt);
+    private void checkDependencies(VirtualFile buildFile, StringBuilder debugInfo) {
+        try {
+            String content = new String(buildFile.contentsToByteArray());
+            
+            // 检查是否包含OpenFeign依赖
+            boolean hasOpenFeign = content.contains("spring-cloud-starter-openfeign") ||
+                                 content.contains("spring-cloud-starter-feign");
+            
+            debugInfo.append("OpenFeign依赖状态: ").append(hasOpenFeign ? "已添加" : "未添加").append("\n");
+            
+            if (!hasOpenFeign) {
+                debugInfo.append("建议添加以下依赖到build.gradle:\n");
+                debugInfo.append("implementation 'org.springframework.cloud:spring-cloud-starter-openfeign'\n");
+            }
+            
+            // 检查Spring Cloud版本
+            if (content.contains("spring-cloud")) {
+                debugInfo.append("已找到Spring Cloud依赖\n");
+            } else {
+                debugInfo.append("建议添加Spring Cloud依赖管理:\n");
+                debugInfo.append("dependencyManagement {\n");
+                debugInfo.append("    imports {\n");
+                debugInfo.append("        mavenBom \"org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}\"\n");
+                debugInfo.append("    }\n");
+                debugInfo.append("}\n");
+            }
+            
+        } catch (IOException e) {
+            debugInfo.append("读取构建文件失败: ").append(e.getMessage()).append("\n");
+        }
+    }
 
-        // 在后台线程中执行文档生成
-        ProgressManager.getInstance().run(
-            new Task.Backgroundable(project, "生成项目文档", true) {
-                private volatile boolean isDisposed = false;
-
-                @Override
-                public void run(@NotNull ProgressIndicator indicator) {
-                    indicator.setIndeterminate(true);
-                    indicator.setText("正在生成项目文档...");
+    private void scanJavaFiles(VirtualFile directory, Collection<PsiClass> controllers, Project project, StringBuilder debugInfo) {
+        if (directory == null) return;
+        
+        debugInfo.append("扫描目录: ").append(directory.getPath()).append("\n");
+        
+        VirtualFile[] children = directory.getChildren();
+        debugInfo.append("目录中的文件数量: ").append(children.length).append("\n");
+        
+        for (VirtualFile file : children) {
+            if (file.isDirectory()) {
+                // 跳过一些不需要扫描的目录
+                String dirName = file.getName().toLowerCase();
+                if (dirName.equals("target") || dirName.equals("build") || dirName.equals(".git") || dirName.equals(".idea")) {
+                    debugInfo.append("跳过目录: ").append(file.getPath()).append("\n");
+                    continue;
+                }
+                scanJavaFiles(file, controllers, project, debugInfo);
+            } else if (file.getName().endsWith(".java")) {
+                debugInfo.append("检查Java文件: ").append(file.getPath()).append("\n");
+                PsiFile psiFile = PsiManager.getInstance(project).findFile(file);
+                if (psiFile instanceof PsiJavaFile) {
+                    PsiClass[] classes = ((PsiJavaFile) psiFile).getClasses();
+                    debugInfo.append("  文件中的类数量: ").append(classes.length).append("\n");
                     
-                    try {
-                        // 开始生成文档
-                        analysisService.generateProjectDocumentation(promt, new LLMEngine.StreamCallback() {
-                            private FileWriter writer;
-
-                            @Override
-                            public void onStart() {
-                                content.get().setLength(0);
-                                windowFactory.submitButton(project);
-//                                windowFactory.updateLoadingProgress(project, "正在初始化文档生成...");
-                                try {
-                                    writer = new FileWriter(docFile);
-                                } catch (IOException ex) {
-                                    windowFactory.updateResult("创建文档文件失败: " + ex.getMessage(), project);
-                                }
-                            }
-
-                            @Override
-                            public void onToken(String token) {
-                                if (isCancelled.get()) {
-                                    try {
-                                        if (writer != null) {
-                                            writer.close();
-                                        }
-                                    } catch (IOException ex) {
-                                        // 忽略关闭时的错误
-                                    }
-                                    throw new ProcessCanceledException();
-                                }
-                                content.get().append(token);
-                                try {
-                                    if (writer != null) {
-                                        writer.write(token);
-                                        writer.flush();
-                                    }
-                                } catch (IOException ex) {
-                                    windowFactory.updateResult("写入文档失败: " + ex.getMessage(), project);
-                                }
-                            }
-
-                            @Override
-                            public void onError(Throwable error) {
-                                try {
-                                    if (writer != null) {
-                                        writer.close();
-                                        writer = null;
-                                    }
-                                } catch (IOException ex) {
-                                    // 忽略关闭时的错误
-                                }
-
-                                // 获取相对路径
-                                String relativePath = new File(docFile).getAbsolutePath()
-                                    .replace(project.getBasePath(), "")
-                                    .replaceFirst("^[/\\\\]", "");
-
-                                if (error instanceof ProcessCanceledException) {
-                                    windowFactory.stopLoadingAnimation(project);
-                                    String cancelMessage = String.format(
-                                        "<div style='padding: 15px; background-color: #fff3e0; border-left: 4px solid #ff9800; margin: 10px 0;'>" +
-                                        "<h3 style='color: #e65100; margin-top: 0;'>⚠️ 文档生成已取消</h3>" +
-                                        "<p style='margin: 5px 0;'><strong>📁 部分内容已保存至：</strong><code style='background: #f5f5f5; padding: 2px 4px; border-radius: 3px;'>%s</code></p>" +
-                                        "<p style='margin: 5px 0;'><strong>💡 提示：</strong>您可以查看已保存的内容，或重新生成完整文档</p>" +
-                                        "</div>",
-                                        relativePath
-                                    );
-                                    windowFactory.updateResult(cancelMessage, project);
-                                } else {
-                                    windowFactory.stopLoadingAnimation(project);
-                                    String errorMessage = String.format(
-                                        "<div style='padding: 15px; background-color: #ffebee; border-left: 4px solid #f44336; margin: 10px 0;'>" +
-                                        "<h3 style='color: #c62828; margin-top: 0;'>❌ 生成文档时发生错误</h3>" +
-                                        "<p style='margin: 5px 0;'><strong>📁 部分内容已保存至：</strong><code style='background: #f5f5f5; padding: 2px 4px; border-radius: 3px;'>%s</code></p>" +
-                                        "<p style='margin: 5px 0;'><strong>❓ 错误信息：</strong>%s</p>" +
-                                        "<p style='margin: 5px 0;'><strong>💡 提示：</strong>请检查错误信息，修复问题后重试</p>" +
-                                        "</div>",
-                                        relativePath,
-                                        error.getMessage()
-                                    );
-                                    windowFactory.updateResult(errorMessage, project);
-                                }
-                                windowFactory.resetButton(project);
-                            }
-
-                            @Override
-                            public void onComplete() {
-                                try {
-                                    if (writer != null) {
-                                        writer.close();
-                                        writer = null;
-                                    }
-                                } catch (IOException ex) {
-                                    // 忽略关闭时的错误
-                                }
-
-                                if (!isCancelled.get()) {
-                                    windowFactory.updateLoadingProgress(project, "文档生成完成，正在保存...");
-                                    windowFactory.stopLoadingAnimation(project);
-                                    
-                                    // 获取相对路径
-                                    String relativePath = new File(docFile).getAbsolutePath()
-                                        .replace(project.getBasePath(), "")
-                                        .replaceFirst("^[/\\\\]", "");
-                                    
-                                    // 构建成功信息
-                                    String successMessage = String.format(
-                                        "<div style='padding: 15px; background-color: #e8f5e9; border-left: 4px solid #4caf50; margin: 10px 0;'>" +
-                                        "<h3 style='color: #2e7d32; margin-top: 0;'>✨ 文档生成成功</h3>" +
-                                        "<p style='margin: 5px 0;'><strong>📁 保存位置：</strong><code style='background: #f5f5f5; padding: 2px 4px; border-radius: 3px;'>%s</code></p>" +
-                                        "<p style='margin: 5px 0;'><strong>📝 文件大小：</strong>%.2f KB</p>" +
-                                        "<p style='margin: 5px 0;'><strong>⏱️ 生成时间：</strong>%s</p>" +
-                                        "<p style='margin: 5px 0;'><strong>💡 提示：</strong>您可以在项目目录的 docs 文件夹中找到生成的文档</p>" +
-                                        "</div>",
-                                        relativePath,
-                                        new File(docFile).length() / 1024.0,
-                                        LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-                                    );
-                                    
-                                    windowFactory.updateResult(successMessage, project);
-                                    
-                                    // 刷新文件系统以显示新文件
-                                    VirtualFileManager.getInstance().refreshWithoutFileWatcher(true);
-                                    VirtualFile docDirFile = LocalFileSystem.getInstance().refreshAndFindFileByPath(docDir);
-                                    if (docDirFile != null) {
-                                        docDirFile.refresh(false, false);
-                                    }
-                                }
-                                windowFactory.resetButton(project);
-                            }
-                        });
-                    } catch (ProcessCanceledException e) {
-                        // 处理取消操作
-                        isCancelled.set(true);
-                        if (analysisService != null) {
-                            analysisService.setCancelled(true);
+                    for (PsiClass psiClass : classes) {
+                        debugInfo.append("  检查类: ").append(psiClass.getName())
+                                .append(" (是否接口: ").append(psiClass.isInterface())
+                                .append(", 注解数量: ").append(psiClass.getAnnotations().length)
+                                .append(")\n");
+                        
+                        // 打印所有注解的完整名称
+                        for (PsiAnnotation annotation : psiClass.getAnnotations()) {
+                            String qualifiedName = annotation.getQualifiedName();
+                            debugInfo.append("    注解: ").append(qualifiedName).append("\n");
                         }
-                        throw e;
-                    } finally {
-                        isDisposed = true;
-                    }
-                }
-
-                @Override
-                public void onCancel() {
-                    isCancelled.set(true);
-                    if (analysisService != null) {
-                        analysisService.setCancelled(true);
-                    }
-//                    windowFactory.clearProgressIndicator(project);
-                    isDisposed = true;
-                }
-
-                @Override
-                public void onFinished() {
-                    if (!isDisposed) {
-                        isDisposed = true;
-                    }
-                }
-            }
-        );
-    }
-
-    private String buildPromt(List<String> projectFiles){
-        // 构建提示词
-        StringBuilder promptBuilder = new StringBuilder();
-        promptBuilder.append("请为以下项目生成详细的文档，包括：\n\n");
-        promptBuilder.append("1. 项目概述\n");
-        promptBuilder.append("   - 项目名称和描述\n");
-        promptBuilder.append("   - 主要功能和目标\n");
-        promptBuilder.append("   - 技术栈和依赖\n\n");
-        promptBuilder.append("2. 项目结构\n");
-        promptBuilder.append("   - 目录结构说明\n");
-        promptBuilder.append("   - 主要模块和包\n");
-        promptBuilder.append("   - 关键文件说明\n\n");
-        promptBuilder.append("3. 核心功能\n");
-        promptBuilder.append("   - 主要类和接口\n");
-        promptBuilder.append("   - 关键算法和实现\n");
-        promptBuilder.append("   - 数据流和交互\n\n");
-        promptBuilder.append("4. 开发指南\n");
-        promptBuilder.append("   - 环境配置\n");
-        promptBuilder.append("   - 构建和部署\n");
-        promptBuilder.append("   - 测试和调试\n\n");
-        promptBuilder.append("5. 维护说明\n");
-        promptBuilder.append("   - 代码规范\n");
-        promptBuilder.append("   - 常见问题\n");
-        promptBuilder.append("   - 扩展建议\n\n");
-        promptBuilder.append("项目文件列表：\n");
-        for (String file : projectFiles) {
-            if (isCancelled.get()) {
-                throw new ProcessCanceledException();
-            }
-            promptBuilder.append("- ").append(file).append("\n");
-        }
-        return promptBuilder.toString();
-    }
-    private List<String> collectProjectFiles(File directory) {
-        List<String> files = new ArrayList<>();
-        if (directory.isDirectory()) {
-            File[] children = directory.listFiles();
-            if (children != null) {
-                for (File child : children) {
-                    if (child.isDirectory()) {
-                        // 跳过 .git, .idea 等目录
-                        if (!child.getName().startsWith(".")) {
-                            files.addAll(collectProjectFiles(child));
-                        }
-                    } else {
-                        // 只收集源代码文件
-                        String name = child.getName().toLowerCase();
-                        if (name.endsWith(".java") || name.endsWith(".kt") ||
-                                name.endsWith(".py") || name.endsWith(".js") ||
-                                name.endsWith(".ts") || name.endsWith(".cpp") ||
-                                name.endsWith(".h") || name.endsWith(".cs")) {
-                            files.add(child.getAbsolutePath());
+                        
+                        if (isControllerClass(psiClass)) {
+                            debugInfo.append("  找到FeignClient接口: ").append(psiClass.getName()).append("\n");
+                            controllers.add(psiClass);
                         }
                     }
+                } else {
+                    debugInfo.append("  不是Java文件或无法解析\n");
                 }
             }
         }
-        return files;
+    }
+
+    private boolean isControllerClass(PsiClass psiClass) {
+        if (psiClass == null) {
+            return false;
+        }
+        
+        if (!psiClass.isInterface()) {
+            return false;
+        }
+        
+        // 检查是否有@FeignClient注解
+        for (PsiAnnotation annotation : psiClass.getAnnotations()) {
+            String qualifiedName = annotation.getQualifiedName();
+            if (qualifiedName != null) {
+                if (qualifiedName.equals(FEIGN_CLIENT_ANNOTATION) ||
+                    qualifiedName.equals("FeignClient") ||
+                    qualifiedName.equals("org.springframework.cloud.openfeign.FeignClient") ||
+                    qualifiedName.equals("org.springframework.cloud.netflix.feign.FeignClient")) {
+                    return true;
+                }
+            }
+        }
+        
+        return false;
+    }
+
+    private String getFeignClientPath(PsiClass feignInterface) {
+        PsiAnnotation feignClient = feignInterface.getAnnotation(FEIGN_CLIENT_ANNOTATION);
+        if (feignClient == null) {
+            // 尝试使用简写形式
+            feignClient = feignInterface.getAnnotation("FeignClient");
+        }
+        
+        if (feignClient != null) {
+            // 首先尝试获取name属性
+            PsiAnnotationMemberValue nameValue = feignClient.findAttributeValue("name");
+            if (nameValue != null) {
+                return nameValue.getText().replace("\"", "");
+            }
+            // 如果没有name属性，尝试获取value属性
+            PsiAnnotationMemberValue value = feignClient.findAttributeValue("value");
+            if (value != null) {
+                return value.getText().replace("\"", "");
+            }
+        }
+        return "";
+    }
+
+    private Map<String, Object> scanMethodMapping(PsiMethod method, String basePath) {
+        Map<String, Object> apiDoc = null;
+        
+        // 检查PostMapping注解
+        PsiAnnotation postMapping = method.getAnnotation(POST_MAPPING);
+        if (postMapping != null) {
+            apiDoc = createApiDoc(method, postMapping, basePath, "POST");
+        }
+        
+        // 检查GetMapping注解
+        PsiAnnotation getMapping = method.getAnnotation(GET_MAPPING);
+        if (getMapping != null) {
+            apiDoc = createApiDoc(method, getMapping, basePath, "GET");
+        }
+        
+        return apiDoc;
+    }
+
+    private Map<String, Object> createApiDoc(PsiMethod method, PsiAnnotation mapping, String basePath, String httpMethod) {
+        Map<String, Object> apiDoc = new HashMap<>();
+        
+        // 获取URL路径
+        PsiAnnotationMemberValue value = mapping.findAttributeValue("value");
+        String path = value != null ? value.getText().replace("\"", "") : "";
+        
+        // 组合完整路径
+        String fullPath = basePath + (path.startsWith("/") ? path : "/" + path);
+        apiDoc.put("url", fullPath);
+        apiDoc.put("method", httpMethod);
+        apiDoc.put("javaMethod", method.getName());
+        
+        // 获取入参
+        PsiParameter[] parameters = method.getParameterList().getParameters();
+        if (parameters.length > 0) {
+            Map<String, String> inputParams = new HashMap<>();
+            for (PsiParameter param : parameters) {
+                // 检查是否有@RequestBody注解
+                PsiAnnotation requestBody = param.getAnnotation("org.springframework.web.bind.annotation.RequestBody");
+                if (requestBody != null) {
+                    inputParams.put("body", getParameterType(param));
+                } else {
+                    inputParams.put(param.getName(), getParameterType(param));
+                }
+            }
+            apiDoc.put("input", inputParams);
+        }
+        
+        // 获取返回值类型
+        PsiType returnType = method.getReturnType();
+        if (returnType != null) {
+            apiDoc.put("output", getReturnType(returnType));
+        }
+        
+        return apiDoc;
+    }
+
+    private String getParameterType(PsiParameter parameter) {
+        PsiType type = parameter.getType();
+        if (type instanceof PsiClassType) {
+            PsiClass psiClass = ((PsiClassType) type).resolve();
+            if (psiClass != null) {
+                return psiClass.getName();
+            }
+        }
+        return type.getPresentableText();
+    }
+
+    private String getReturnType(PsiType returnType) {
+        if (returnType instanceof PsiClassType) {
+            PsiClass psiClass = ((PsiClassType) returnType).resolve();
+            if (psiClass != null) {
+                return psiClass.getName();
+            }
+        }
+        return returnType.getPresentableText();
+    }
+
+    private String generateJsonDocument(List<Map<String, Object>> apiDocs) {
+        StringBuilder json = new StringBuilder();
+        json.append("{\n");
+        json.append("  \"apis\": [\n");
+        
+        for (int i = 0; i < apiDocs.size(); i++) {
+            Map<String, Object> api = apiDocs.get(i);
+            json.append("    {\n");
+            json.append("      \"url\": \"").append(api.get("url")).append("\",\n");
+            json.append("      \"method\": \"").append(api.get("method")).append("\",\n");
+            json.append("      \"javaMethod\": \"").append(api.get("javaMethod")).append("\",\n");
+            
+            if (api.containsKey("input")) {
+                json.append("      \"input\": ").append(convertMapToJson((Map<String, String>) api.get("input"))).append(",\n");
+            }
+            
+            if (api.containsKey("output")) {
+                json.append("      \"output\": \"").append(api.get("output")).append("\"\n");
+            }
+            
+            json.append("    }").append(i < apiDocs.size() - 1 ? "," : "").append("\n");
+        }
+        
+        json.append("  ]\n");
+        json.append("}");
+        
+        return json.toString();
+    }
+
+    private String convertMapToJson(Map<String, String> map) {
+        StringBuilder json = new StringBuilder();
+        json.append("{");
+        
+        int i = 0;
+        for (Map.Entry<String, String> entry : map.entrySet()) {
+            json.append("\"").append(entry.getKey()).append("\": \"").append(entry.getValue()).append("\"");
+            if (i < map.size() - 1) {
+                json.append(", ");
+            }
+            i++;
+        }
+        
+        json.append("}");
+        return json.toString();
+    }
+
+    @Override
+    public void update(@NotNull AnActionEvent e) {
+        Project project = e.getData(CommonDataKeys.PROJECT);
+        e.getPresentation().setEnabledAndVisible(project != null);
     }
 } 

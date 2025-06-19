@@ -72,6 +72,8 @@
     <depends optional="true" config-file="git4idea.xml">Git4Idea</depends>
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.modules.java</depends>
+    <depends>com.intellij.modules.lang</depends>
+
 
 
     <extensions defaultExtensionNs="com.intellij">
@@ -146,10 +148,10 @@
                 text="API 文档"
                 description="生成 API 接口文档"/>
 
-        <action id="com.yohannzhang.aigit.action.GenerateUmlDiagramAction"
-                class="com.yohannzhang.aigit.action.GenerateUmlDiagramAction"
-                text="UML 图表"
-                description="生成 UML 类图"/>
+<!--        <action id="com.yohannzhang.aigit.action.GenerateUmlDiagramAction"-->
+<!--                class="com.yohannzhang.aigit.action.GenerateUmlDiagramAction"-->
+<!--                text="UML 图表"-->
+<!--                description="生成 UML 类图"/>-->
 
         <action id="com.yohannzhang.aigit.action.GenerateDependencyGraphAction"
                 class="com.yohannzhang.aigit.action.GenerateDependencyGraphAction"
@@ -160,6 +162,31 @@
                 class="com.yohannzhang.aigit.action.GenerateBilingualDocAction"
                 text="中英双语文档"
                 description="生成中英双语项目文档"/>
+
+<!--        <action id="com.yohannzhang.aigit.action.GenerateClassDependencyFlowAction"-->
+<!--                class="com.yohannzhang.aigit.action.GenerateClassDependencyFlowAction"-->
+<!--                text="生成类依赖关系图"-->
+<!--                description="分析类的上下游依赖关系并生成流程图">-->
+<!--            <add-to-group group-id="EditorPopupMenu" anchor="first"/>-->
+<!--            <keyboard-shortcut keymap="$default" first-keystroke="alt D"/>-->
+<!--        </action>-->
+
+<!--        <action id="com.yohannzhang.aigit.action.GenerateProjectAnalysisAction"-->
+<!--                class="com.yohannzhang.aigit.action.GenerateProjectAnalysisAction"-->
+<!--                text="项目分析报告"-->
+<!--                description="生成详细的项目分析报告，包括代码质量、复杂度、重复代码和依赖关系分析">-->
+<!--            <add-to-group group-id="ProjectViewPopupMenu" anchor="first"/>-->
+<!--            <keyboard-shortcut keymap="$default" first-keystroke="alt P"/>-->
+<!--        </action>-->
+
+        <action id="AIGit.CodeRAG" 
+                class="com.yohannzhang.aigit.core.actions.CodeRAGAction"
+                text="Code RAG Search"
+                description="Search code using RAG technology"
+                icon="AllIcons.Actions.Search">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl shift R"/>
+        </action>
 
     </actions>
 

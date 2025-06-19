@@ -23,6 +23,7 @@ import com.yohannzhang.aigit.util.GItCommitUtil;
 import com.yohannzhang.aigit.util.IdeaDialogUtil;
 import git4idea.GitLocalBranch;
 import git4idea.repo.GitRepository;
+import git4idea.repo.GitRepositoryChangeListener;
 import git4idea.repo.GitRepositoryManager;
 import org.jetbrains.annotations.NotNull;
 
@@ -191,7 +192,9 @@ public class GenerateCommitMessageAction extends AnAction {
             }
 
             CommitMessage commitMessage = getCommitMessage(e);
-            currentCommitMessage.set(commitMessage);
+
+            // 清空commit message
+            commitMessage.setCommitMessage("");
 
             List<Change> includedChanges = commitWorkflowHandler.getUi().getIncludedChanges();
             List<FilePath> includedUnversionedFiles = commitWorkflowHandler.getUi().getIncludedUnversionedFiles();
@@ -206,7 +209,8 @@ public class GenerateCommitMessageAction extends AnAction {
             if (branchName == null) {
                 branchName = "unknown";
             }
-
+            commitMessage.setCommitMessage("");
+            currentCommitMessage.set(commitMessage);
             commitMessage.setCommitMessage(branchName + ":" + Constants.GENERATING_COMMIT_MESSAGE);
 
             String diff = GItCommitUtil.computeDiff(includedChanges, includedUnversionedFiles, project);

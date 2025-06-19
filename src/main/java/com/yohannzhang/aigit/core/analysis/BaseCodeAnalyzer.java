@@ -28,15 +28,55 @@ public class BaseCodeAnalyzer implements CodeAnalyzer {
         Project project = new Project(projectId, projectName, projectPath);
 
         try {
+            Map<String, String> fileContents = new HashMap<>();
+            final int[] totalLines = {0};
+            final int[] commentLines = {0};
+            final Map<String, Integer> languageStats = new HashMap<>();
+            final Map<String, Integer> symbolStats = new HashMap<>();
+
             Files.walkFileTree(projectPath, new SimpleFileVisitor<Path>() {
                 @Override
                 public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
                     if (isSourceFile(file)) {
                         try {
-                            FileMetadata metadata = analyzeFile(file);
+                            String content = Files.readString(file);
+                            String language = getLanguage(file);
+                            fileContents.put(file.toString(), content);
+                            
+                            // 计算行数统计
+                            List<String> lines = content.lines().collect(Collectors.toList());
+                            totalLines[0] += lines.size();
+                            commentLines[0] += lines.stream()
+                                .filter(line -> line.trim().startsWith("//") || 
+                                              line.trim().startsWith("/*") || 
+                                              line.trim().startsWith("*") || 
+                                              line.trim().startsWith("#"))
+                                .count();
+
+                            // 更新语言统计
+                            languageStats.merge(language, 1, Integer::sum);
+
+                            // 更新符号统计
+                            Map<String, List<Symbol>> symbols = extractSymbols(content, language);
+                            symbols.forEach((type, symbolList) -> 
+                                symbolStats.merge(type, symbolList.size(), Integer::sum));
+
+                            // 添加文件元数据
+                            FileMetadata metadata = new FileMetadata(
+                                file.toString(),
+                                language,
+                                attrs.size(),
+                                lines.size(),
+                                LocalDateTime.ofInstant(attrs.lastModifiedTime().toInstant(), java.time.ZoneId.systemDefault()),
+                                String.valueOf(content.hashCode()),
+                                symbols,
+                                extractDependencies(content, language),
+                                generateSummary(content, language)
+                            );
                             project.addFile(metadata);
+
                         } catch (IOException e) {
-                            System.err.println("Error analyzing file: " + file);
+                            System.err.println("Error reading file: " + file);
                             e.printStackTrace();
                         }
                     }
@@ -45,8 +85,36 @@ public class BaseCodeAnalyzer implements CodeAnalyzer {
             });
 
             // 分析项目统计信息
-            analyzeProjectStats(project);
+            Map<String, Object> stats = new HashMap<>();
             
+            // 文件统计
+            stats.put("totalFiles", project.getFiles().size());
+            stats.put("totalLines", totalLines[0]);
+            stats.put("commentLines", commentLines[0]);
+            stats.put("commentRatio", totalLines[0] > 0 ? (double) commentLines[0] / totalLines[0] : 0.0);
+            
+            // 语言统计
+            stats.put("languages", languageStats);
+            
+            // 符号统计
+            stats.put("symbols", symbolStats);
+            
+            // 代码质量分析
+            Map<String, Object> qualityMetrics = new HashMap<>();
+            qualityMetrics.put("totalLines", totalLines[0]);
+            qualityMetrics.put("commentLines", commentLines[0]);
+            qualityMetrics.put("commentRatio", totalLines[0] > 0 ? (double) commentLines[0] / totalLines[0] : 0.0);
+            stats.put("qualityMetrics", qualityMetrics);
+            
+            // 分析代码重复
+            List<Map<String, Object>> duplications = analyzeDuplication(project);
+            stats.put("duplications", duplications);
+            
+            // 分析依赖关系
+            Map<String, List<String>> dependencies = analyzeDependencies(project);
+            stats.put("dependencies", dependencies);
+            
+            project.addStat("stats", stats);
             return project;
         } catch (IOException e) {
             throw new RuntimeException("Error analyzing project: " + projectPath, e);
@@ -724,30 +792,6 @@ public class BaseCodeAnalyzer implements CodeAnalyzer {
         return "unknown";
     }
 
-    private void analyzeProjectStats(Project project) {
-        Map<String, Object> stats = new HashMap<>();
-        
-        // 语言统计
-        Map<String, Long> languageStats = project.getFiles().values().stream()
-            .collect(Collectors.groupingBy(FileMetadata::getLanguage, Collectors.counting()));
-        stats.put("languages", languageStats);
-        
-        // 文件统计
-        stats.put("totalFiles", project.getFiles().size());
-        stats.put("totalLines", project.getFiles().values().stream()
-            .mapToLong(FileMetadata::getLines)
-            .sum());
-        
-        // 符号统计
-        Map<String, Long> symbolStats = project.getFiles().values().stream()
-            .flatMap(f -> f.getSymbols().values().stream())
-            .flatMap(List::stream)
-            .collect(Collectors.groupingBy(Symbol::getType, Collectors.counting()));
-        stats.put("symbols", symbolStats);
-        
-        project.addStat("stats", stats);
-    }
-
     @Override
     public Map<String, Object> analyzeCodeStructure(String code, String language) {
         Map<String, Object> structure = new HashMap<>();
@@ -831,5 +875,156 @@ public class BaseCodeAnalyzer implements CodeAnalyzer {
                 break;
         }
         return count;
+    }
+
+    @Override
+    public Map<String, Object> generateCodeQualityReport(Project project) {
+        Map<String, Object> report = new HashMap<>();
+        List<Map<String, Object>> fileReports = new ArrayList<>();
+        Map<String, Object> summary = new HashMap<>();
+        
+        // 初始化汇总数据
+        int totalFiles = 0;
+        int totalLines = 0;
+        int totalCommentLines = 0;
+        int totalComplexity = 0;
+        int totalNamingIssues = 0;
+        Map<String, Integer> languageStats = new HashMap<>();
+        Map<String, Integer> complexityByLanguage = new HashMap<>();
+        
+        // 分析每个文件
+        for (Map.Entry<String, FileMetadata> entry : project.getFiles().entrySet()) {
+            String filePath = entry.getKey();
+            FileMetadata metadata = entry.getValue();
+            String language = metadata.getLanguage();
+            
+            try {
+                String content = Files.readString(Paths.get(filePath));
+                Map<String, Object> fileQuality = analyzeCodeQuality(content, language);
+                
+                // 更新汇总数据
+                totalFiles++;
+                totalLines += (int) fileQuality.get("totalLines");
+                totalCommentLines += (int) fileQuality.get("commentLines");
+                totalComplexity += (int) fileQuality.get("cyclomaticComplexity");
+                totalNamingIssues += (int) fileQuality.get("namingIssues");
+                
+                // 更新语言统计
+                languageStats.merge(language, 1, Integer::sum);
+                complexityByLanguage.merge(language, (int) fileQuality.get("cyclomaticComplexity"), Integer::sum);
+                
+                // 创建文件报告
+                Map<String, Object> fileReport = new HashMap<>();
+                fileReport.put("filePath", filePath);
+                fileReport.put("language", language);
+                fileReport.put("metrics", fileQuality);
+                fileReport.put("symbols", metadata.getSymbols());
+                fileReport.put("dependencies", metadata.getDependencies());
+                
+                fileReports.add(fileReport);
+                
+            } catch (IOException e) {
+                System.err.println("Error analyzing file: " + filePath);
+                e.printStackTrace();
+            }
+        }
+        
+        // 计算平均值
+        double avgComplexity = totalFiles > 0 ? (double) totalComplexity / totalFiles : 0;
+        double avgNamingIssues = totalFiles > 0 ? (double) totalNamingIssues / totalFiles : 0;
+        double commentRatio = totalLines > 0 ? (double) totalCommentLines / totalLines : 0;
+        
+        // 设置汇总信息
+        summary.put("totalFiles", totalFiles);
+        summary.put("totalLines", totalLines);
+        summary.put("totalCommentLines", totalCommentLines);
+        summary.put("commentRatio", commentRatio);
+        summary.put("totalComplexity", totalComplexity);
+        summary.put("avgComplexity", avgComplexity);
+        summary.put("totalNamingIssues", totalNamingIssues);
+        summary.put("avgNamingIssues", avgNamingIssues);
+        summary.put("languageStats", languageStats);
+        summary.put("complexityByLanguage", complexityByLanguage);
+        
+        // 添加质量评级
+        String qualityRating = calculateQualityRating(avgComplexity, avgNamingIssues, commentRatio);
+        summary.put("qualityRating", qualityRating);
+        
+        // 添加建议
+        List<String> recommendations = generateRecommendations(summary);
+        summary.put("recommendations", recommendations);
+        
+        // 构建最终报告
+        report.put("summary", summary);
+        report.put("fileReports", fileReports);
+        report.put("generatedAt", LocalDateTime.now().toString());
+        
+        return report;
+    }
+    
+    private String calculateQualityRating(double avgComplexity, double avgNamingIssues, double commentRatio) {
+        int score = 100;
+        
+        // 圈复杂度评分 (0-40分)
+        if (avgComplexity > 20) score -= 40;
+        else if (avgComplexity > 15) score -= 30;
+        else if (avgComplexity > 10) score -= 20;
+        else if (avgComplexity > 5) score -= 10;
+        
+        // 命名规范评分 (0-30分)
+        if (avgNamingIssues > 5) score -= 30;
+        else if (avgNamingIssues > 3) score -= 20;
+        else if (avgNamingIssues > 1) score -= 10;
+        
+        // 注释比例评分 (0-30分)
+        if (commentRatio < 0.1) score -= 30;
+        else if (commentRatio < 0.2) score -= 20;
+        else if (commentRatio < 0.3) score -= 10;
+        
+        // 返回评级
+        if (score >= 90) return "A";
+        if (score >= 80) return "B";
+        if (score >= 70) return "C";
+        if (score >= 60) return "D";
+        return "F";
+    }
+    
+    private List<String> generateRecommendations(Map<String, Object> summary) {
+        List<String> recommendations = new ArrayList<>();
+        
+        double avgComplexity = (double) summary.get("avgComplexity");
+        double avgNamingIssues = (double) summary.get("avgNamingIssues");
+        double commentRatio = (double) summary.get("commentRatio");
+        
+        // 圈复杂度建议
+        if (avgComplexity > 15) {
+            recommendations.add("建议重构高复杂度的代码，将复杂方法拆分为更小的函数");
+        } else if (avgComplexity > 10) {
+            recommendations.add("考虑优化部分复杂方法的实现");
+        }
+        
+        // 命名规范建议
+        if (avgNamingIssues > 3) {
+            recommendations.add("需要统一代码命名规范，修复命名问题");
+        } else if (avgNamingIssues > 1) {
+            recommendations.add("建议检查并修复命名不规范的问题");
+        }
+        
+        // 注释建议
+        if (commentRatio < 0.1) {
+            recommendations.add("代码注释严重不足，建议增加必要的文档注释");
+        } else if (commentRatio < 0.2) {
+            recommendations.add("建议为关键代码添加更多注释");
+        }
+        
+        // 语言相关建议
+        Map<String, Integer> complexityByLanguage = (Map<String, Integer>) summary.get("complexityByLanguage");
+        complexityByLanguage.forEach((language, complexity) -> {
+            if (complexity > 100) {
+                recommendations.add(String.format("%s语言的代码复杂度较高，建议进行重构", language));
+            }
+        });
+        
+        return recommendations;
     }
 } 

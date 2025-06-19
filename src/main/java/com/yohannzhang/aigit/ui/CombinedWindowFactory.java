@@ -15,16 +15,12 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.project.ProjectManagerListener;
 import com.intellij.openapi.ui.Messages;
-import com.intellij.openapi.ui.popup.JBPopupFactory;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.openapi.wm.ToolWindowFactory;
-import com.intellij.ui.AnimatedIcon;
-import com.intellij.ui.DocumentAdapter;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.content.Content;
 import com.intellij.ui.jcef.JBCefBrowser;
 import com.intellij.util.messages.MessageBusConnection;
-import com.intellij.util.ui.JBUI;
 import com.vladsch.flexmark.html.HtmlRenderer;
 import com.vladsch.flexmark.parser.Parser;
 import com.vladsch.flexmark.util.data.MutableDataSet;
@@ -33,24 +29,19 @@ import com.yohannzhang.aigit.config.ChatHistoryService;
 import com.yohannzhang.aigit.constant.Constants;
 import com.yohannzhang.aigit.service.CodeService;
 import com.yohannzhang.aigit.service.impl.OllamaService;
+import com.yohannzhang.aigit.service.RagService;
 import com.yohannzhang.aigit.util.CodeUtil;
 import com.yohannzhang.aigit.util.IdeaDialogUtil;
 import com.yohannzhang.aigit.util.OpenAIUtil;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
-import javax.swing.border.TitledBorder;
-import javax.swing.event.DocumentEvent;
 import java.awt.*;
 import java.awt.event.*;
-import java.awt.geom.AffineTransform;
-import java.awt.image.BufferedImage;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -137,15 +128,20 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
             }
         });
 
-        // 添加历史记录图标
-        AnAction historyAction = new AnAction("Show Chat History", "Show chat history", AllIcons.Vcs.History) {
+        // 添加RAG按钮到titleActions
+        AnAction ragAction = new AnAction("RAG Analysis", "Perform RAG analysis on project", AllIcons.Actions.Refresh) {
             @Override
             public void actionPerformed(@NotNull AnActionEvent e) {
-//                toggleHistoryView(project);
+                RagService ragService = new RagService(project);
+                ragService.performRag();
+                // Show success message
+                Messages.showInfoMessage(project, 
+                    "RAG analysis completed. Results saved in 'rag_results' directory.", 
+                    "RAG Analysis");
             }
         };
 
-        toolWindow.setTitleActions(Collections.singletonList(historyAction));
+        toolWindow.setTitleActions(Collections.singletonList(ragAction));
 
         JPanel panel = new JPanel(new GridBagLayout());
         // 使用 GridBagLayout 布局管理器，适应复杂 UI 结构
@@ -163,11 +159,6 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
 
         Content content = toolWindow.getContentManager().getFactory().createContent(panel, "", false);
         toolWindow.getContentManager().addContent(content);
-
-        // 快捷键
-        historyAction.registerCustomShortcutSet(
-                new CustomShortcutSet(KeyStroke.getKeyStroke(KeyEvent.VK_H, InputEvent.CTRL_DOWN_MASK)),
-                panel);
 
         instances.put(project, this);
     }
@@ -320,27 +311,16 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         UIState state = getOrCreateState(project);
         JPanel outputPanel = new JPanel(new BorderLayout(10, 10));
         outputPanel.setBackground(ideBackgroundColor);
-//        outputPanel.setBorder(BorderFactory.createTitledBorder(
-//                BorderFactory.createLineBorder(new Color(200, 200, 200), 1),
-//                "AI 助手",
-//                TitledBorder.LEFT,
-//                TitledBorder.TOP,
-//                new Font("SansSerif", Font.BOLD, 14),
-//                new Color(76, 175, 80) // 使用柔和的绿色突出标题
-//        ));
-
 
         state.markdownViewer = JBCefBrowser.createBuilder()
                 .setUrl("about:blank")
                 .build();
         state.markdownViewer.getComponent().setBorder(BorderFactory.createEmptyBorder());
 
-//        String welcomeHtml = readResourceFile("empty.html");
         String welcomeHtml = HtmlTemplateReplacer.replaceCssVariables("empty.html", fontSize, ideBackgroundColor, ideFontColor);
 
        ApplicationManager.getApplication().invokeLater(() -> {
             state.markdownViewer.loadHTML(welcomeHtml);
-//            state.markdownViewer.getCefBrowser().executeJavaScript(script, "about:blank", 0);
         });
 
         outputPanel.add(state.markdownViewer.getComponent(), BorderLayout.CENTER);
@@ -1036,5 +1016,44 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
 //            fadeTimer.start();
 //        }
 //    }
+
+    private void toggleHistoryView(Project project) {
+        UIState state = uiStates.get(project);
+        if (state == null) return;
+
+        if (state.isHistoryView) {
+            // Switch back to chat view
+            state.outputPanel.removeAll();
+            state.outputPanel.add(state.markdownViewer.getComponent(), BorderLayout.CENTER);
+            state.isHistoryView = false;
+        } else {
+            // Switch to history view
+            JPanel historyPanel = new JPanel(new BorderLayout());
+            historyPanel.setBackground(ideBackgroundColor);
+
+            // Create history list
+            state.historyListModel = new DefaultListModel<>();
+            JList<HistoryItem> historyList = new JList<>(state.historyListModel);
+            historyList.setCellRenderer(new HistoryListCellRenderer());
+            historyList.setBackground(ideBackgroundColor);
+            historyList.setForeground(ideFontColor);
+
+            // Load history
+            ChatHistoryService service = ChatHistoryService.getInstance();
+            Map<String, String> history = service.getChatHistory();
+            for (Map.Entry<String, String> entry : history.entrySet()) {
+                state.historyListModel.addElement(new HistoryItem(entry.getKey(), 
+                    LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"))));
+            }
+
+            historyPanel.add(new JBScrollPane(historyList), BorderLayout.CENTER);
+            state.outputPanel.removeAll();
+            state.outputPanel.add(historyPanel, BorderLayout.CENTER);
+            state.isHistoryView = true;
+        }
+
+        state.outputPanel.revalidate();
+        state.outputPanel.repaint();
+    }
 
 }
