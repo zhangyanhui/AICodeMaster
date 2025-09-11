@@ -392,24 +392,127 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
 
     private JPanel createInputPanel(Project project) {
         UIState state = getOrCreateState(project);
-        JPanel inputPanel = new JPanel(new BorderLayout(1, 1)); // 调整整体组件间距为 5
+        JPanel inputPanel = new JPanel(new BorderLayout(1, 1));
         inputPanel.setBackground(ideBackgroundColor);
+
+        // 创建主输入容器
+        JPanel inputContainer = new JPanel(new BorderLayout());
+        inputContainer.setBackground(ideBackgroundColor);
+        inputContainer.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(200, 200, 200), 1),
+                BorderFactory.createEmptyBorder(2, 2, 2, 2)
+        ));
+
+        // 创建文本输入区域
+        JTextArea questionTextArea = new JTextArea(3, 50);
+        questionTextArea.setLineWrap(true);
+        questionTextArea.setWrapStyleWord(true);
+        questionTextArea.setBackground(ideBackgroundColor);
+        questionTextArea.setForeground(new Color(180, 180, 180));
+        questionTextArea.requestFocusInWindow();
+        questionTextArea.setBorder(BorderFactory.createEmptyBorder(12, 16, 30, 16)); // 精细调整底部间距
+
+        String placeholderText = "输入问题，点击提交按钮发送";
+        questionTextArea.setText(placeholderText);
+
+        questionTextArea.addFocusListener(new FocusAdapter() {
+            @Override
+            public void focusGained(FocusEvent e) {
+                SwingUtilities.invokeLater(() -> {
+                    String currentText = questionTextArea.getText();
+                    Color currentColor = questionTextArea.getForeground();
+                    Color placeholderColor = new Color(180, 180, 180);
+                    
+                    // 更精确的placeholder检测：检查文本内容和颜色状态
+                    if (currentText.equals(placeholderText) || 
+                        currentText.trim().equals(placeholderText.trim()) ||
+                        (currentColor != null && currentColor.equals(placeholderColor))) {
+                        questionTextArea.setText("");
+                        questionTextArea.setForeground(ideFontColor);
+                    }
+                });
+            }
+
+            @Override
+            public void focusLost(FocusEvent e) {
+                SwingUtilities.invokeLater(() -> {
+                    String currentText = questionTextArea.getText();
+                    if (currentText == null || currentText.trim().isEmpty()) {
+                        questionTextArea.setText(placeholderText);
+                        questionTextArea.setForeground(new Color(180, 180, 180));
+                    }
+                });
+            }
+        });
+
+        // 添加鼠标点击监听器作为额外保障
+        questionTextArea.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                SwingUtilities.invokeLater(() -> {
+                    String currentText = questionTextArea.getText();
+                    Color currentColor = questionTextArea.getForeground();
+                    Color placeholderColor = new Color(180, 180, 180);
+                    
+                    if (currentText.equals(placeholderText) || 
+                        currentText.trim().equals(placeholderText.trim()) ||
+                        (currentColor != null && currentColor.equals(placeholderColor))) {
+                        questionTextArea.setText("");
+                        questionTextArea.setForeground(ideFontColor);
+                        questionTextArea.requestFocusInWindow();
+                    }
+                });
+            }
+        });
+
+        // 添加键盘事件监听器：回车发送，Alt+回车换行
+        questionTextArea.addKeyListener(new KeyAdapter() {
+            @Override
+            public void keyPressed(KeyEvent e) {
+                if (e.getKeyCode() == KeyEvent.VK_ENTER) {
+                    if (e.isAltDown()) {
+                        // Alt+回车：插入换行符
+                        int caretPosition = questionTextArea.getCaretPosition();
+                        String currentText = questionTextArea.getText();
+                        String newText = currentText.substring(0, caretPosition) + "\n" + currentText.substring(caretPosition);
+                        questionTextArea.setText(newText);
+                        questionTextArea.setCaretPosition(caretPosition + 1);
+                        e.consume(); // 阻止默认行为
+                    } else {
+                        // 单独回车：发送消息
+                        e.consume(); // 阻止默认换行行为
+                        handleAskButtonClick(project);
+                    }
+                }
+            }
+        });
+
+        questionTextArea.setEditable(true);
+
+        // 创建底部控制栏（模型选择 + 按钮）
+        JPanel bottomControlPanel = new JPanel(new BorderLayout());
+        bottomControlPanel.setBackground(ideBackgroundColor);
+        bottomControlPanel.setBorder(BorderFactory.createEmptyBorder(0, 12, 4, 12)); // 减少上边距，贴近底部
+
+        // 左侧：模型选择区域
+        JPanel modelPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 2)); // 减少垂直间距
+        modelPanel.setBackground(ideBackgroundColor);
 
         String[] clientArr = ApiKeySettings.getInstance().getAvailableModels();
         JComboBox<String> modelComboBox = new JComboBox<>(clientArr);
         modelComboBox.setSelectedItem(ApiKeySettings.getInstance().getSelectedClient());
-        modelComboBox.setPreferredSize(new Dimension(120, 32));
+        modelComboBox.setPreferredSize(new Dimension(100, 24));
         modelComboBox.setBackground(ideBackgroundColor);
         modelComboBox.setForeground(ideFontColor);
-        modelComboBox.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        modelComboBox.setFont(new Font("SansSerif", Font.PLAIN, 11));
 
         String[] modelArr = Constants.CLIENT_MODULES.get(modelComboBox.getSelectedItem());
         JComboBox<String> modelSelectComboBox = new JComboBox<>(modelArr);
         modelSelectComboBox.setSelectedItem(ApiKeySettings.getInstance().getSelectedModule());
-        modelSelectComboBox.setPreferredSize(new Dimension(120, 32));
+        modelSelectComboBox.setPreferredSize(new Dimension(100, 24));
         modelSelectComboBox.setBackground(ideBackgroundColor);
         modelSelectComboBox.setForeground(ideFontColor);
-        modelSelectComboBox.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        modelSelectComboBox.setFont(new Font("SansSerif", Font.PLAIN, 11));
 
         modelComboBox.addActionListener(e -> {
             String selectedClient = (String) modelComboBox.getSelectedItem();
@@ -426,89 +529,49 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
             ApiKeySettings.getInstance().setSelectedModule(selectedModel);
         });
 
-        JPanel leftPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        leftPanel.setBackground(ideBackgroundColor);
-        leftPanel.add(modelComboBox);
-        leftPanel.add(modelSelectComboBox);
+        modelPanel.add(modelComboBox);
+        modelPanel.add(modelSelectComboBox);
 
-        JButton askButton = createStyledButton("提交");
-        JButton cancelButton = createStyledButton("取消");
+        // 右侧：按钮区域
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 2)); // 减少垂直间距
+        buttonPanel.setBackground(ideBackgroundColor);
+
+        JButton askButton = createCompactButton("提交");
+        JButton cancelButton = createCompactButton("取消");
         cancelButton.setBackground(new Color(231, 76, 60));
         cancelButton.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(new Color(231, 76, 60), 1),
-                BorderFactory.createEmptyBorder(6, 16, 6, 16)
+                BorderFactory.createEmptyBorder(3, 10, 3, 10)
         ));
         cancelButton.setVisible(false);
 
         askButton.addActionListener(e -> handleAskButtonClick(project));
         cancelButton.addActionListener(e -> handleCancel(project));
 
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
-        buttonPanel.setBackground(ideBackgroundColor);
         buttonPanel.add(askButton);
         buttonPanel.add(cancelButton);
 
-        JPanel topPanel = new JPanel(new BorderLayout());
-        topPanel.setBackground(ideBackgroundColor);
-        topPanel.add(leftPanel, BorderLayout.WEST);
-        topPanel.add(buttonPanel, BorderLayout.EAST);
+        // 组装底部控制栏
+        bottomControlPanel.add(modelPanel, BorderLayout.WEST);
+        bottomControlPanel.add(buttonPanel, BorderLayout.EAST);
 
-        JTextArea questionTextArea = new JTextArea(3, 50);
-        questionTextArea.setLineWrap(true);
-        questionTextArea.setWrapStyleWord(true);
-        questionTextArea.setBackground(ideBackgroundColor);
-        questionTextArea.setForeground(new Color(180, 180, 180));
-        questionTextArea.requestFocusInWindow();
+        // 创建文本区域容器，使用BorderLayout替代OverlayLayout
+        JPanel textContainer = new JPanel(new BorderLayout());
+        textContainer.setBackground(ideBackgroundColor);
 
-        String placeholderText = "输入问题，点击提交按钮发送";
-        questionTextArea.setText(placeholderText);
+        // 添加滚动面板
+        JBScrollPane scrollPane = new JBScrollPane(questionTextArea);
+        scrollPane.setBorder(null);
+        scrollPane.setBackground(ideBackgroundColor);
+        scrollPane.getViewport().setBackground(ideBackgroundColor);
 
-        questionTextArea.addFocusListener(new FocusAdapter() {
-            @Override
-            public void focusGained(FocusEvent e) {
-                SwingUtilities.invokeLater(() -> {
-                    if (questionTextArea.getText().equals(placeholderText)) {
-                        questionTextArea.setText("");
-                        questionTextArea.setForeground(ideFontColor);
-                    }
-                });
-            }
+        // 添加组件到容器
+        textContainer.add(scrollPane, BorderLayout.CENTER);
+        textContainer.add(bottomControlPanel, BorderLayout.SOUTH);
 
-            @Override
-            public void focusLost(FocusEvent e) {
-                SwingUtilities.invokeLater(() -> {
-                    if (questionTextArea.getText().isEmpty()) {
-                        questionTextArea.setText(placeholderText);
-                        questionTextArea.setForeground(new Color(180, 180, 180));
-                    }
-                });
-            }
-        });
-
-        questionTextArea.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(200, 200, 200), 1),
-                BorderFactory.createEmptyBorder(8, 12, 8, 12)
-        ));
-
-        // 添加文档监听器用于触发补全
-//        questionTextArea.getDocument().addDocumentListener(new DocumentAdapter() {
-//            @Override
-//            protected void textChanged(@NotNull DocumentEvent e) {
-//                ApplicationManager.getApplication().invokeLater(() -> {
-//                    if (SwingUtilities.isEventDispatchThread()) {
-//                        showNaturalLanguageSuggestions(project, questionTextArea);
-//                    }
-//                });
-//            }
-//        });
-
-        questionTextArea.setEditable(true);
-
-        // 设置边距，控制面板与窗口边缘的距离
-//        inputPanel.setBorder(BorderFactory.createEmptyBorder(1, 1, 1, 1));
-
-        inputPanel.add(topPanel, BorderLayout.SOUTH);
-        inputPanel.add(new JBScrollPane(questionTextArea), BorderLayout.CENTER);
+        // 最终组装
+        inputContainer.add(textContainer, BorderLayout.CENTER);
+        inputPanel.add(inputContainer, BorderLayout.CENTER);
 
         refreshComponentBackground(inputPanel);
 
@@ -520,6 +583,42 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         state.questionTextArea = questionTextArea;
 
         return inputPanel;
+    }
+
+    private JButton createCompactButton(String text) {
+        JButton button = new JButton(text);
+        button.setFont(new Font("SansSerif", Font.BOLD, 11));
+        button.setOpaque(true);
+        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        button.setPreferredSize(new Dimension(50, 24));
+        button.setFocusPainted(false);
+
+        // 设置默认样式
+        button.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(214, 236, 221), 1),
+                BorderFactory.createEmptyBorder(3, 10, 3, 10)
+        ));
+
+        // 添加鼠标事件
+        button.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                button.setBorder(BorderFactory.createCompoundBorder(
+                        BorderFactory.createLineBorder(new Color(52, 152, 219), 1),
+                        BorderFactory.createEmptyBorder(3, 10, 3, 10)
+                ));
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                button.setBorder(BorderFactory.createCompoundBorder(
+                        BorderFactory.createLineBorder(new Color(214, 236, 221), 1),
+                        BorderFactory.createEmptyBorder(3, 10, 3, 10)
+                ));
+            }
+        });
+
+        return button;
     }
 
 
@@ -631,12 +730,16 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
             return;
         }
 
+        // 立即清空输入框并恢复placeholder
         ApplicationManager.getApplication().invokeLater(() -> {
             state.askButton.setVisible(false);
             state.cancelButton.setVisible(true);
+            // 清空输入框并恢复placeholder状态
+            state.questionTextArea.setText("输入问题，点击提交按钮发送");
+            state.questionTextArea.setForeground(new Color(180, 180, 180));
         });
 
-        state.chatHistory.setLength(0);
+        // 不清空聊天历史，保持累积对话
         state.messageBuilder.setLength(0);
         state.currentAnswer.setLength(0);
 
@@ -658,7 +761,10 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         );
 
         state.chatHistory.append(formattedQuestion);
-        state.chatHistory.append("<hr style='border: none; border-top: 1px solid #ddd; margin: 20px 0;'>");
+        // 不在这里添加分割线，等答案完成后统一添加
+        
+        // 立即显示问题到答案区域（显示完整的历史记录，包括刚添加的问题）
+        updateResult(state.chatHistory.toString(), project);
 
         CodeService codeService = new CodeService();
         String prompt = String.format("根据提出的问题作出回答，用中文回答；若需编程，请给出示例，以Java作为默认编程语言输出；问题如下：%s", CODE_UTIL.formatCode(question));
@@ -669,7 +775,8 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
                 public void run(@NotNull ProgressIndicator indicator) {
                     state.messageBuilder.setLength(0);
                     state.currentAnswer.setLength(0);
-                    state.currentAnswer.append(formattedQuestion);
+                    // 保持完整的历史记录
+                    state.currentAnswer.append(state.chatHistory.toString());
 
                     AtomicReference<String> displayContent = new AtomicReference<>();
                     try {
@@ -688,19 +795,31 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
                                                         "</div>",
                                                 qaId, timestamp, state.messageBuilder.toString()
                                         );
-                                        displayContent.set(state.currentAnswer +
-                                                "<hr style='border: none; border-top: 1px solid #ddd; margin: 20px 0;'>" +
-                                                formattedAnswer);
+                                        displayContent.set(state.currentAnswer + formattedAnswer);
                                         updateResult(displayContent.get(), project);
                                     },
                                     error -> ApplicationManager.getApplication().invokeLater(() ->
                                             IdeaDialogUtil.showError(project, "处理失败: " + error.getMessage(), "Error")),
                                     () -> {
+                                        // 将完整的问答对添加到历史记录
+                                        String finalAnswer = String.format(
+                                                "<div class='chat-item answer-item' id='answer-%s' style='margin: 10px 0; padding: 10px; border-left: 3px solid #2196F3;'>" +
+                                                        "<div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;'>" +
+                                                        "<strong style='color: #2196F3;'>A:</strong>" +
+                                                        "<span style='color: #666; font-size: 0.9em;'>%s</span>" +
+                                                        "</div>" +
+                                                        "<div style='margin-left: 20px;'>%s</div>" +
+                                                        "</div>",
+                                                qaId, timestamp, state.messageBuilder.toString()
+                                        );
+                                        // 只在答案后面添加一条分割线，为下一轮对话做准备
+                                        state.chatHistory.append(finalAnswer);
+                                        state.chatHistory.append("<hr style='border: none; border-top: 1px solid #ddd; margin: 20px 0;'>");
+                                        
                                         saveHistory(project, question, displayContent.get());
                                         ApplicationManager.getApplication().invokeLater(() -> {
                                             resetButton(project);
-                                            state.questionTextArea.setText("输入问题，点击提交按钮发送");
-                                            state.questionTextArea.setForeground(new Color(180, 180, 180));
+                                            // 不需要再次设置placeholder，因为已经在点击时设置了
                                         });
                                     }
                             );

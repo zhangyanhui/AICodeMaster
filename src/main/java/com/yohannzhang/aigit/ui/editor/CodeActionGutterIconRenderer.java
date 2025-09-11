@@ -137,35 +137,90 @@ public class CodeActionGutterIconRenderer extends GutterIconRenderer {
             }
         });
 
-        actionGroup.add(new AnAction("优化代码") {
+        actionGroup.add(new AnAction("Code Review") {
             @Override
             public void actionPerformed(@NotNull AnActionEvent e) {
-                String promt = "# Java代码优化提示词\n" +
+                String promt = "# Java代码Code Review提示词\n" +
                         "\n" +
-                        "请对以下代码提供优化建议，重点包括：\n" +
+                        "请对以下代码进行Code Review，重点关注以下方面：\n" +
                         "\n" +
-                        "1. 性能瓶颈\n" +
-                        "   - 时间复杂度、内存泄漏、循环内创建对象\n" +
+                        "1. **空指针异常检查**\n" +
+                        "   - 方法参数是否进行null检查\n" +
+                        "   - 对象调用前是否判断null\n" +
+                        "   - 集合操作前是否检查空集合\n" +
                         "\n" +
-                        "2. 结构改进\n" +
-                        "   - 方法拆分、提取公共逻辑、简化嵌套\n" +
+                        "2. **内存溢出风险**\n" +
+                        "   - 大对象创建和生命周期管理\n" +
+                        "   - 循环中的对象创建\n" +
+                        "   - 资源未正确释放（IO、数据库连接等）\n" +
                         "\n" +
-                        "3. 新特性应用\n" +
-                        "   - Stream API、var关键字、Optional使用\n" +
+                        "3. **线程安全问题**\n" +
+                        "   - 共享变量的同步访问\n" +
+                        "   - 死锁风险检查\n" +
+                        "   - 原子操作的正确使用\n" +
                         "\n" +
-                        "4. 并发优化\n" +
-                        "   - synchronized优化、线程池配置、并发集合\n" +
+                        "4. **异常处理**\n" +
+                        "   - 异常捕获的粒度是否合适\n" +
+                        "   - 是否有异常信息丢失\n" +
+                        "   - 资源释放的finally处理\n" +
                         "\n" +
-                        "5. 可读性增强\n" +
-                        "   - 变量重命名、魔法数常量化、布尔表达式分解\n" +
+                        "5. **性能问题**\n" +
+                        "   - 算法复杂度分析\n" +
+                        "   - 不必要的重复计算\n" +
+                        "   - 数据库查询优化\n" +
                         "\n" +
-                        "格式要求：\n" +
-                        "- 问题定位：`类名#方法名(行号)`\n" +
-                        "- 原代码片段：`代码摘录`\n" +
-                        "- 优化方案：具体修改建议\n" +
-                        "- 预期收益：性能/可维护性说明\n" +
+                        "**重要要求：对于发现的每个问题，必须同时提供：**\n" +
+                        "1. 具体的代码行号定位\n" +
+                        "2. 完整的源代码片段（包含上下文）\n" +
+                        "3. 详细的问题描述和修复建议\n" +
                         "\n" +
-                        "待优化代码如下：\n";
+                        "输出格式要求：\n" +
+                        "❌ **[问题类型]** (第X-Y行): 问题详细描述\n" +
+                        "\n" +
+                        "**问题代码：**\n" +
+                        "```java\n" +
+                        "// 第X行开始\n" +
+                        "完整的问题代码片段（包含足够的上下文）\n" +
+                        "// 第Y行结束\n" +
+                        "```\n" +
+                        "\n" +
+                        "**问题分析：** 详细说明为什么这段代码有问题\n" +
+                        "\n" +
+                        "✅ **修复建议：**\n" +
+                        "```java\n" +
+                        "// 修复后的代码\n" +
+                        "完整的修复后代码片段\n" +
+                        "```\n" +
+                        "\n" +
+                        "---\n" +
+                        "\n" +
+                        "示例输出：\n" +
+                        "❌ **[空指针风险]** (第15-17行): 方法参数未进行null检查，直接调用trim()方法\n" +
+                        "\n" +
+                        "**问题代码：**\n" +
+                        "```java\n" +
+                        "// 第15行开始\n" +
+                        "public void setUserName(String name) {\n" +
+                        "    this.userName = name.trim(); // 第16行：可能抛出NullPointerException\n" +
+                        "    System.out.println(\"用户名已设置: \" + this.userName); // 第17行\n" +
+                        "}\n" +
+                        "// 第18行结束\n" +
+                        "```\n" +
+                        "\n" +
+                        "**问题分析：** 当name参数为null时，调用trim()方法会导致NullPointerException异常\n" +
+                        "\n" +
+                        "✅ **修复建议：**\n" +
+                        "```java\n" +
+                        "public void setUserName(String name) {\n" +
+                        "    if (name == null) {\n" +
+                        "        throw new IllegalArgumentException(\"用户名不能为null\");\n" +
+                        "    }\n" +
+                        "    this.userName = name.trim();\n" +
+                        "    System.out.println(\"用户名已设置: \" + this.userName);\n" +
+                        "}\n" +
+                        "```\n" +
+                        "\n" +
+                        "待Review代码如下：\n";
 
                 analyzeCode(promt);
             }

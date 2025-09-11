@@ -20,7 +20,7 @@ import com.yohannzhang.aigit.util.IdeaDialogUtil;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * 代码优化处理类
+ * 代码Review处理类
  *
  * @author yohannzhang
  * @date 2025/5/16 13:08
@@ -51,7 +51,7 @@ public class OptimizeCodeAction extends AnAction {
         String selectedText = editor.getDocument().getText();
         if (selectedText == null || selectedText.isEmpty()) {
             ActionControl.endAction();
-            showWarningDialog("你想问什么!");
+            showWarningDialog("请选中代码后再进行Code Review!");
             return;
         }
 
@@ -71,19 +71,46 @@ public class OptimizeCodeAction extends AnAction {
 
         toolWindow.show(null);
         try {
-            processCodeOptimization(project, selectedText);
+            processCodeReview(project, selectedText);
         } finally {
             ActionControl.endAction();
         }
     }
 
-    private void processCodeOptimization(Project project, String selectedText) {
+    private void processCodeReview(Project project, String selectedText) {
         CodeService codeService = new CodeService();
         String formattedCode = CODE_UTIL.formatCode(selectedText);
         String prompt = String.format(
-                "你是一个Java代码开发专家，请根据给出的代码，用中文提出相应的优化建议。" +
-                        "生成回答输出格式分为四部分，分别为1：代码的解释，" +
-                        "2：优化后的代码，3：优化点解释。待优化代码如下：%s",
+                "你是一个Java代码Review专家，请对给出的代码进行全面的Code Review。" +
+                        "重点检查空指针、内存溢出、线程安全、异常处理、性能问题等方面。" +
+                        "\n\n**重要要求：对于发现的每个问题，必须同时提供：**\n" +
+                        "1. 具体的代码行号定位\n" +
+                        "2. 完整的源代码片段（包含上下文）\n" +
+                        "3. 详细的问题描述和修复建议\n" +
+                        "\n输出格式要求：\n" +
+                        "❌ **[问题类型]** (第X-Y行): 问题详细描述\n" +
+                        "\n" +
+                        "**问题代码：**\n" +
+                        "```java\n" +
+                        "// 第X行开始\n" +
+                        "完整的问题代码片段（包含足够的上下文）\n" +
+                        "// 第Y行结束\n" +
+                        "```\n" +
+                        "\n" +
+                        "**问题分析：** 详细说明为什么这段代码有问题\n" +
+                        "\n" +
+                        "✅ **修复建议：**\n" +
+                        "```java\n" +
+                        "// 修复后的代码\n" +
+                        "完整的修复后代码片段\n" +
+                        "```\n" +
+                        "\n" +
+                        "---\n" +
+                        "\n" +
+                        "如果代码质量良好，请用以下格式说明：\n" +
+                        "✅ **代码质量评估：** 经过详细review，该代码段在以下方面表现良好：[具体说明]\n" +
+                        "\n" +
+                        "待Review代码如下：%s",
                 formattedCode
         );
 
@@ -110,7 +137,7 @@ public class OptimizeCodeAction extends AnAction {
                 } catch (IllegalArgumentException ex) {
                     showConfigWarning(project, ex);
                 } catch (Exception ex) {
-                    showError(project, "Error generating commit message: " + ex.getMessage());
+                    showError(project, "Error performing code review: " + ex.getMessage());
                 }
             }
 
@@ -125,7 +152,7 @@ public class OptimizeCodeAction extends AnAction {
 
             private void handleErrorResponse(Throwable error) {
                 ApplicationManager.getApplication().invokeLater(() -> {
-                    showError(project, "Error generating commit message: " + error.getMessage());
+                    showError(project, "Error performing code review: " + error.getMessage());
                 });
             }
         });
