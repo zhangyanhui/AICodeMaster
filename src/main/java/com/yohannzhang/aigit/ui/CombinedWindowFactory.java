@@ -747,22 +747,51 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         state.selectedFilesList.setBorder(BorderFactory.createEmptyBorder(3, 0, 3, 0));
         state.selectedFilesList.setFixedCellHeight(20);
         
-        // 设置列表渲染器
-        state.selectedFilesList.setCellRenderer(new DefaultListCellRenderer() {
+        // 设置列表渲染器 - 带删除按钮的自定义渲染器
+        state.selectedFilesList.setCellRenderer(new FileListCellRenderer(project));
+        
+        // 添加鼠标点击监听器处理删除按钮点击
+        state.selectedFilesList.addMouseListener(new MouseAdapter() {
             @Override
-            public Component getListCellRendererComponent(JList<?> list, Object value, int index,
-                                                          boolean isSelected, boolean cellHasFocus) {
-                super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
-                if (value instanceof String) {
-                    String filePath = (String) value;
-                    String fileName = filePath.substring(filePath.lastIndexOf('/') + 1);
-                    setText("● " + fileName); // 添加小圆点作为标识
-                    setToolTipText(filePath);
+            public void mouseClicked(MouseEvent e) {
+                int index = state.selectedFilesList.locationToIndex(e.getPoint());
+                if (index >= 0 && index < state.selectedFilesModel.getSize()) {
+                    Rectangle cellBounds = state.selectedFilesList.getCellBounds(index, index);
+                    if (cellBounds != null) {
+                        // 检查是否点击了删除按钮区域（右侧22px区域）
+                        int relativeX = e.getX() - cellBounds.x;
+                        int cellWidth = cellBounds.width;
+                        if (relativeX > cellWidth - 22 && relativeX < cellWidth) {
+                            // 点击了删除按钮
+                            String filePath = state.selectedFilesModel.getElementAt(index);
+                            state.selectedFilesModel.removeElement(filePath);
+                            state.selectedFilesPaths.remove(filePath);
+                            state.fileContentsCache.remove(filePath);
+                            updateFileDisplay(state, state.fileCountLabel, state.fileListScrollPane);
+                            e.consume(); // 阻止事件传播
+                        }
+                    }
                 }
-                setBackground(isSelected ? new Color(230, 240, 250) : ideBackgroundColor);
-                setForeground(isSelected ? new Color(60, 120, 180) : new Color(100, 100, 100));
-                setBorder(BorderFactory.createEmptyBorder(2, 0, 2, 0));
-                return this;
+            }
+            
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                // 更新鼠标样式
+                updateMouseCursor(e, state.selectedFilesList);
+            }
+            
+            @Override
+            public void mouseMoved(MouseEvent e) {
+                // 更新鼠标样式
+                updateMouseCursor(e, state.selectedFilesList);
+            }
+        });
+        
+        // 添加鼠标移动监听器
+        state.selectedFilesList.addMouseMotionListener(new MouseMotionAdapter() {
+            @Override
+            public void mouseMoved(MouseEvent e) {
+                updateMouseCursor(e, state.selectedFilesList);
             }
         });
         
@@ -785,23 +814,6 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         clearButton.addActionListener(e -> {
             handleClearFiles(project);
             updateFileDisplay(state, state.fileCountLabel, state.fileListScrollPane);
-        });
-        
-        // 支持双击删除文件
-        state.selectedFilesList.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseClicked(MouseEvent e) {
-                if (e.getClickCount() == 2) {
-                    int index = state.selectedFilesList.locationToIndex(e.getPoint());
-                    if (index >= 0) {
-                        String filePath = state.selectedFilesModel.getElementAt(index);
-                        state.selectedFilesModel.removeElement(filePath);
-                        state.selectedFilesPaths.remove(filePath);
-                        state.fileContentsCache.remove(filePath);
-                        updateFileDisplay(state, state.fileCountLabel, state.fileListScrollPane);
-                    }
-                }
-            }
         });
         
         // 组装面板
@@ -1147,7 +1159,7 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         if (state == null || state.questionTextArea == null) return;
 
         String question = state.questionTextArea.getText().trim();
-        if (question.isEmpty() || question.equals("输入问题，点击提交按钮发送")) {
+        if (question.isEmpty() || question.equals("输入问题，点击回车或提交发送")) {
             String errorMessage = "<div style='color: #ff6b6b; padding: 10px; background-color: rgba(255, 107, 107, 0.1); border-radius: 4px;'>请输入问题内容</div>";
             updateResult(errorMessage, project);
             return;
@@ -1158,7 +1170,7 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
             state.askButton.setVisible(false);
             state.cancelButton.setVisible(true);
             // 清空输入框并恢复placeholder状态
-            state.questionTextArea.setText("输入问题，点击提交按钮发送");
+            state.questionTextArea.setText("输入问题，点击回车或提交发送");
             state.questionTextArea.setForeground(new Color(180, 180, 180));
         });
 
@@ -1624,6 +1636,97 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
 
         state.outputPanel.revalidate();
         state.outputPanel.repaint();
+    }
+
+    /**
+     * 更新鼠标光标样式
+     */
+    private void updateMouseCursor(MouseEvent e, JList<String> fileList) {
+        int index = fileList.locationToIndex(e.getPoint());
+        if (index >= 0 && index < fileList.getModel().getSize()) {
+            Rectangle cellBounds = fileList.getCellBounds(index, index);
+            if (cellBounds != null) {
+                int relativeX = e.getX() - cellBounds.x;
+                int cellWidth = cellBounds.width;
+                // 在删除按钮区域显示手型光标
+                if (relativeX > cellWidth - 22 && relativeX < cellWidth) {
+                    fileList.setCursor(new Cursor(Cursor.HAND_CURSOR));
+                } else {
+                    fileList.setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
+                }
+            }
+        } else {
+            fileList.setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
+        }
+    }
+    
+    /**
+     * 自定义文件列表渲染器 - 带删除按钮
+     */
+    private class FileListCellRenderer extends JPanel implements ListCellRenderer<String> {
+        private final Project project;
+        private JLabel fileLabel;
+        private JLabel deleteLabel;
+        private String filePath;
+        private boolean isSelected;
+        
+        public FileListCellRenderer(Project project) {
+            this.project = project;
+            setLayout(new BorderLayout());
+            setOpaque(true);
+            
+            // 文件名标签
+            fileLabel = new JLabel();
+            fileLabel.setFont(new Font("SansSerif", Font.PLAIN, 11));
+            fileLabel.setBorder(BorderFactory.createEmptyBorder(2, 4, 2, 4));
+            add(fileLabel, BorderLayout.CENTER);
+            
+            // 删除按钮标签 - 美化样式
+            deleteLabel = new JLabel("×");
+            deleteLabel.setFont(new Font("SansSerif", Font.BOLD, 14));
+            deleteLabel.setForeground(new Color(180, 180, 180));
+            deleteLabel.setHorizontalAlignment(SwingConstants.CENTER);
+            deleteLabel.setVerticalAlignment(SwingConstants.CENTER);
+            deleteLabel.setPreferredSize(new Dimension(18, 18));
+            deleteLabel.setBorder(BorderFactory.createEmptyBorder(1, 1, 1, 3));
+            deleteLabel.setOpaque(true);
+            deleteLabel.setBackground(new Color(245, 245, 245));
+            deleteLabel.setCursor(new Cursor(Cursor.HAND_CURSOR));
+            
+            add(deleteLabel, BorderLayout.EAST);
+        }
+        
+        @Override
+        public Component getListCellRendererComponent(JList<? extends String> list, String value, int index,
+                                                      boolean isSelected, boolean cellHasFocus) {
+            this.filePath = value;
+            this.isSelected = isSelected;
+            
+            if (value != null) {
+                String fileName = value.substring(value.lastIndexOf('/') + 1);
+                fileLabel.setText("● " + fileName);
+                setToolTipText(value);
+            }
+            
+            // 设置背景和前景颜色
+            Color backgroundColor = isSelected ? new Color(230, 240, 250) : ideBackgroundColor;
+            Color foregroundColor = isSelected ? new Color(60, 120, 180) : new Color(100, 100, 100);
+            
+            setBackground(backgroundColor);
+            fileLabel.setForeground(foregroundColor);
+            fileLabel.setBackground(backgroundColor);
+            
+            // 删除按钮的样式调整
+            if (isSelected) {
+                deleteLabel.setBackground(new Color(220, 230, 240));
+                deleteLabel.setForeground(new Color(150, 150, 150));
+            } else {
+                deleteLabel.setBackground(new Color(248, 248, 248));
+                deleteLabel.setForeground(new Color(180, 180, 180));
+            }
+            
+            return this;
+        }
     }
 
 }
