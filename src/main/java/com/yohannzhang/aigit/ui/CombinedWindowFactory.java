@@ -14,10 +14,16 @@ import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.project.ProjectManagerListener;
+import com.intellij.openapi.roots.ProjectFileIndex;
 import com.intellij.openapi.ui.Messages;
+import com.intellij.openapi.ui.popup.JBPopup;
+import com.intellij.openapi.ui.popup.JBPopupFactory;
+import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.openapi.wm.ToolWindowFactory;
 import com.intellij.ui.components.JBScrollPane;
+import com.intellij.ui.components.JBTextField;
 import com.intellij.ui.content.Content;
 import com.intellij.ui.jcef.JBCefBrowser;
 import com.intellij.util.messages.MessageBusConnection;
@@ -89,6 +95,19 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         private final StringBuilder messageBuilder = new StringBuilder();
         Timer loadingTimer;
         JPanel loadingPanel;
+        // 上下文文件选择相关组件
+        JPanel contextPanel;
+        JButton selectFileButton;
+        JList<String> selectedFilesList;
+        DefaultListModel<String> selectedFilesModel;
+        java.util.List<String> selectedFilesPaths = new java.util.ArrayList<>();
+        java.util.Map<String, String> fileContentsCache = new java.util.HashMap<>();
+        // 项目文件搜索相关
+        java.util.List<VirtualFile> projectFiles = new java.util.ArrayList<>();
+        DefaultListModel<VirtualFile> searchResultsModel = new DefaultListModel<>();
+        // 界面组件引用（用于更新显示）
+        JLabel fileCountLabel;
+        JBScrollPane fileListScrollPane;
     }
 
     static {
@@ -395,14 +414,17 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         JPanel inputPanel = new JPanel(new BorderLayout(1, 1));
         inputPanel.setBackground(ideBackgroundColor);
 
-        // 创建主输入容器
-        JPanel inputContainer = new JPanel(new BorderLayout());
-        inputContainer.setBackground(ideBackgroundColor);
-        inputContainer.setBorder(BorderFactory.createCompoundBorder(
+        // 创建统一的输入容器
+        JPanel unifiedInputContainer = new JPanel(new BorderLayout());
+        unifiedInputContainer.setBackground(ideBackgroundColor);
+        unifiedInputContainer.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(new Color(200, 200, 200), 1),
                 BorderFactory.createEmptyBorder(2, 2, 2, 2)
         ));
 
+        // 创建上下文文件区域（放在顶部）
+        JPanel contextFileArea = createIntegratedContextFilePanel(project);
+        
         // 创建文本输入区域
         JTextArea questionTextArea = new JTextArea(3, 50);
         questionTextArea.setLineWrap(true);
@@ -569,9 +591,12 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         textContainer.add(scrollPane, BorderLayout.CENTER);
         textContainer.add(bottomControlPanel, BorderLayout.SOUTH);
 
-        // 最终组装
-        inputContainer.add(textContainer, BorderLayout.CENTER);
-        inputPanel.add(inputContainer, BorderLayout.CENTER);
+        // 组装统一输入容器
+        unifiedInputContainer.add(contextFileArea, BorderLayout.NORTH);
+        unifiedInputContainer.add(textContainer, BorderLayout.CENTER);
+        
+        // 最终组装到主面板
+        inputPanel.add(unifiedInputContainer, BorderLayout.CENTER);
 
         refreshComponentBackground(inputPanel);
 
@@ -619,6 +644,404 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         });
 
         return button;
+    }
+    
+    /**
+     * 创建紧凑的文件操作按钮
+     */
+    private JButton createCompactFileButton(String text) {
+        JButton button = new JButton(text);
+        button.setFont(new Font("SansSerif", Font.PLAIN, 11));
+        button.setOpaque(false);
+        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        button.setPreferredSize(new Dimension(text.equals("选择文件") ? 60 : 35, 22));
+        button.setFocusPainted(false);
+        button.setBorderPainted(false);
+        button.setContentAreaFilled(false);
+        
+        // 添加悬停效果
+        button.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                button.setForeground(new Color(52, 152, 219));
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                if (text.equals("清空")) {
+                    button.setForeground(new Color(180, 180, 180));
+                } else {
+                    button.setForeground(ideFontColor);
+                }
+            }
+        });
+
+        return button;
+    }
+    
+    /**
+     * 更新文件显示状态
+     */
+    private void updateFileDisplay(UIState state, JLabel fileCountLabel, JBScrollPane fileListScrollPane) {
+        int fileCount = state.selectedFilesPaths.size();
+        if (fileCount == 0) {
+            fileCountLabel.setText("未选择文件");
+            fileListScrollPane.setVisible(false);
+            fileListScrollPane.setPreferredSize(new Dimension(0, 0));
+        } else {
+            fileCountLabel.setText("已选择 " + fileCount + " 个文件");
+            fileListScrollPane.setVisible(true);
+            // 动态调整高度，最多显示3行
+            int displayHeight = Math.min(fileCount * 20 + 6, 66);
+            fileListScrollPane.setPreferredSize(new Dimension(0, displayHeight));
+        }
+        // 刷新布局
+        SwingUtilities.invokeLater(() -> {
+            if (state.contextPanel != null) {
+                state.contextPanel.revalidate();
+                state.contextPanel.repaint();
+            }
+        });
+    }
+
+    /**
+     * 创建集成到输入框内的上下文文件面板
+     */
+    private JPanel createIntegratedContextFilePanel(Project project) {
+        UIState state = getOrCreateState(project);
+        
+        JPanel contextPanel = new JPanel(new BorderLayout(0, 0));
+        contextPanel.setBackground(ideBackgroundColor);
+        contextPanel.setBorder(BorderFactory.createEmptyBorder(8, 12, 0, 12)); // 只设置左右和上边距
+
+        // 创建顶部操作栏（选择按钮 + 文件计数）
+        JPanel topActionPanel = new JPanel(new BorderLayout());
+        topActionPanel.setBackground(ideBackgroundColor);
+        
+        // 左侧：文件操作按钮
+        JPanel actionButtonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        actionButtonPanel.setBackground(ideBackgroundColor);
+        
+        JButton selectFileButton = createCompactFileButton("选择文件");
+        JButton clearButton = createCompactFileButton("清空");
+        clearButton.setForeground(new Color(180, 180, 180));
+        
+        actionButtonPanel.add(selectFileButton);
+        actionButtonPanel.add(Box.createHorizontalStrut(8));
+        actionButtonPanel.add(clearButton);
+        
+        // 右侧：文件计数显示
+        JLabel fileCountLabel = new JLabel("未选择文件");
+        fileCountLabel.setFont(new Font("SansSerif", Font.PLAIN, 11));
+        fileCountLabel.setForeground(new Color(128, 128, 128));
+        
+        topActionPanel.add(actionButtonPanel, BorderLayout.WEST);
+        topActionPanel.add(fileCountLabel, BorderLayout.EAST);
+        
+        // 创建文件列表区域（只在有文件时显示）
+        state.selectedFilesModel = new DefaultListModel<>();
+        state.selectedFilesList = new JList<>(state.selectedFilesModel);
+        state.selectedFilesList.setBackground(ideBackgroundColor);
+        state.selectedFilesList.setForeground(ideFontColor);
+        state.selectedFilesList.setFont(new Font("SansSerif", Font.PLAIN, 11));
+        state.selectedFilesList.setBorder(BorderFactory.createEmptyBorder(3, 0, 3, 0));
+        state.selectedFilesList.setFixedCellHeight(20);
+        
+        // 设置列表渲染器
+        state.selectedFilesList.setCellRenderer(new DefaultListCellRenderer() {
+            @Override
+            public Component getListCellRendererComponent(JList<?> list, Object value, int index,
+                                                          boolean isSelected, boolean cellHasFocus) {
+                super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+                if (value instanceof String) {
+                    String filePath = (String) value;
+                    String fileName = filePath.substring(filePath.lastIndexOf('/') + 1);
+                    setText("● " + fileName); // 添加小圆点作为标识
+                    setToolTipText(filePath);
+                }
+                setBackground(isSelected ? new Color(230, 240, 250) : ideBackgroundColor);
+                setForeground(isSelected ? new Color(60, 120, 180) : new Color(100, 100, 100));
+                setBorder(BorderFactory.createEmptyBorder(2, 0, 2, 0));
+                return this;
+            }
+        });
+        
+        JBScrollPane fileListScrollPane = new JBScrollPane(state.selectedFilesList);
+        fileListScrollPane.setBorder(null);
+        fileListScrollPane.setBackground(ideBackgroundColor);
+        fileListScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+        fileListScrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        fileListScrollPane.setVisible(false); // 初始隐藏
+        
+        // 保存组件引用到state中
+        state.fileCountLabel = fileCountLabel;
+        state.fileListScrollPane = fileListScrollPane;
+        
+        // 按钮事件处理
+        selectFileButton.addActionListener(e -> {
+            handleSelectFiles(project);
+            // handleSelectFiles中的addSelectedFiles已经处理了显示更新，不需要再次调用
+        });
+        clearButton.addActionListener(e -> {
+            handleClearFiles(project);
+            updateFileDisplay(state, state.fileCountLabel, state.fileListScrollPane);
+        });
+        
+        // 支持双击删除文件
+        state.selectedFilesList.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2) {
+                    int index = state.selectedFilesList.locationToIndex(e.getPoint());
+                    if (index >= 0) {
+                        String filePath = state.selectedFilesModel.getElementAt(index);
+                        state.selectedFilesModel.removeElement(filePath);
+                        state.selectedFilesPaths.remove(filePath);
+                        state.fileContentsCache.remove(filePath);
+                        updateFileDisplay(state, state.fileCountLabel, state.fileListScrollPane);
+                    }
+                }
+            }
+        });
+        
+        // 组装面板
+        contextPanel.add(topActionPanel, BorderLayout.NORTH);
+        contextPanel.add(fileListScrollPane, BorderLayout.CENTER);
+        
+        state.contextPanel = contextPanel;
+        state.selectFileButton = selectFileButton;
+        
+        return contextPanel;
+    }
+    
+    /**
+     * 处理文件选择 - 显示搜索下拉框
+     */
+    private void handleSelectFiles(Project project) {
+        UIState state = uiStates.get(project);
+        if (state == null) return;
+        
+        // 初始化项目文件列表（如果还没有初始化）
+        if (state.projectFiles.isEmpty()) {
+            loadProjectFiles(project, state);
+        }
+        
+        // 创建搜索面板
+        JPanel searchPanel = new JPanel(new BorderLayout(5, 5));
+        searchPanel.setBackground(ideBackgroundColor);
+        searchPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        searchPanel.setPreferredSize(new Dimension(400, 300));
+        
+        // 搜索输入框
+        JBTextField searchField = new JBTextField();
+        searchField.getEmptyText().setText("输入文件名进行搜索...");
+        searchField.setPreferredSize(new Dimension(0, 28));
+        
+        // 搜索结果列表
+        JList<VirtualFile> resultsList = new JList<>(state.searchResultsModel);
+        resultsList.setBackground(ideBackgroundColor);
+        resultsList.setForeground(ideFontColor);
+        resultsList.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
+        
+        // 设置文件列表渲染器
+        resultsList.setCellRenderer(new DefaultListCellRenderer() {
+            @Override
+            public Component getListCellRendererComponent(JList<?> list, Object value, int index,
+                                                          boolean isSelected, boolean cellHasFocus) {
+                super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+                if (value instanceof VirtualFile) {
+                    VirtualFile file = (VirtualFile) value;
+                    String relativePath = getRelativePathFromProject(project, file);
+                    setText(relativePath);
+                    setToolTipText(file.getPath());
+                }
+                setBackground(isSelected ? list.getSelectionBackground() : ideBackgroundColor);
+                setForeground(isSelected ? list.getSelectionForeground() : ideFontColor);
+                return this;
+            }
+        });
+        
+        JBScrollPane scrollPane = new JBScrollPane(resultsList);
+        scrollPane.setPreferredSize(new Dimension(0, 200));
+        
+        // 操作按钮面板
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        buttonPanel.setBackground(ideBackgroundColor);
+        
+        JButton addButton = new JButton("添加选中");
+        addButton.setPreferredSize(new Dimension(80, 28));
+        
+        JButton cancelButton = new JButton("取消");
+        cancelButton.setPreferredSize(new Dimension(60, 28));
+        
+        buttonPanel.add(addButton);
+        buttonPanel.add(cancelButton);
+        
+        // 组装面板
+        searchPanel.add(searchField, BorderLayout.NORTH);
+        searchPanel.add(scrollPane, BorderLayout.CENTER);
+        searchPanel.add(buttonPanel, BorderLayout.SOUTH);
+        
+        // 初始显示所有文件
+        updateSearchResults(state, "");
+        
+        // 创建弹出窗口
+        JBPopup popup = JBPopupFactory.getInstance()
+                .createComponentPopupBuilder(searchPanel, searchField)
+                .setTitle("选择项目文件")
+                .setResizable(true)
+                .setMovable(true)
+                .setRequestFocus(true)
+                .createPopup();
+        
+        // 搜索功能
+        searchField.addKeyListener(new KeyAdapter() {
+            @Override
+            public void keyReleased(KeyEvent e) {
+                String searchText = searchField.getText().trim();
+                updateSearchResults(state, searchText);
+            }
+        });
+        
+        // 双击添加文件
+        resultsList.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2) {
+                    addSelectedFiles(state, resultsList, state.fileCountLabel, state.fileListScrollPane);
+                    popup.closeOk(null);
+                }
+            }
+        });
+        
+        // 按钮事件
+        addButton.addActionListener(e -> {
+            addSelectedFiles(state, resultsList, state.fileCountLabel, state.fileListScrollPane);
+            popup.closeOk(null);
+        });
+        
+        cancelButton.addActionListener(e -> popup.cancel());
+        
+        // 显示弹出窗口，相对于选择按钮
+        popup.showUnderneathOf(state.selectFileButton);
+    }
+    
+    /**
+     * 加载项目文件列表
+     */
+    private void loadProjectFiles(Project project, UIState state) {
+        ProjectFileIndex fileIndex = ProjectFileIndex.SERVICE.getInstance(project);
+        VirtualFile projectDir = project.getBaseDir();
+        
+        if (projectDir != null) {
+            fileIndex.iterateContent(file -> {
+                // 只包括文本文件，排除目录和二进制文件
+                if (!file.isDirectory() && isTextFile(file)) {
+                    state.projectFiles.add(file);
+                }
+                return true;
+            });
+        }
+        
+        // 按文件名排序
+        state.projectFiles.sort((f1, f2) -> f1.getName().compareToIgnoreCase(f2.getName()));
+    }
+    
+    /**
+     * 判断是否为文本文件
+     */
+    private boolean isTextFile(VirtualFile file) {
+        String name = file.getName().toLowerCase();
+        String[] textExtensions = {
+            ".java", ".kt", ".scala", ".groovy",  // JVM语言
+            ".xml", ".html", ".xhtml", ".jsp",    // 标记语言
+            ".js", ".ts", ".json", ".css",       // Web技术
+            ".properties", ".yml", ".yaml",      // 配置文件
+            ".md", ".txt", ".rst",               // 文档
+            ".sql", ".gradle", ".pom",           // 其他
+            ".py", ".rb", ".go", ".rs",          // 其他编程语言
+            ".sh", ".bat", ".cmd"                // 脚本
+        };
+        
+        for (String ext : textExtensions) {
+            if (name.endsWith(ext)) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    /**
+     * 更新搜索结果
+     */
+    private void updateSearchResults(UIState state, String searchText) {
+        state.searchResultsModel.clear();
+        
+        for (VirtualFile file : state.projectFiles) {
+            if (searchText.isEmpty() || 
+                file.getName().toLowerCase().contains(searchText.toLowerCase()) ||
+                file.getPath().toLowerCase().contains(searchText.toLowerCase())) {
+                state.searchResultsModel.addElement(file);
+            }
+        }
+    }
+    
+    /**
+     * 添加选中的文件
+     */
+    private void addSelectedFiles(UIState state, JList<VirtualFile> resultsList, JLabel fileCountLabel, JBScrollPane fileListScrollPane) {
+        java.util.List<VirtualFile> selectedFiles = resultsList.getSelectedValuesList();
+        
+        for (VirtualFile file : selectedFiles) {
+            String filePath = file.getPath();
+            // 避免重复添加
+            if (!state.selectedFilesPaths.contains(filePath)) {
+                state.selectedFilesPaths.add(filePath);
+                state.selectedFilesModel.addElement(filePath);
+                
+                // 预加载文件内容
+                try {
+                    String content = new String(file.contentsToByteArray(), file.getCharset());
+                    state.fileContentsCache.put(filePath, content);
+                } catch (Exception e) {
+                    // 如果读取失败，记录错误但不影响使用
+                    state.fileContentsCache.put(filePath, "文件读取失败: " + e.getMessage());
+                }
+            }
+        }
+        
+        // 立即更新文件显示状态
+        SwingUtilities.invokeLater(() -> {
+            updateFileDisplay(state, fileCountLabel, fileListScrollPane);
+        });
+    }
+    
+    /**
+     * 获取相对于项目的路径
+     */
+    private String getRelativePathFromProject(Project project, VirtualFile file) {
+        VirtualFile projectDir = project.getBaseDir();
+        if (projectDir != null) {
+            String projectPath = projectDir.getPath();
+            String filePath = file.getPath();
+            if (filePath.startsWith(projectPath)) {
+                return filePath.substring(projectPath.length() + 1);
+            }
+        }
+        return file.getName();
+    }
+    
+    /**
+     * 清空选中的文件
+     */
+    private void handleClearFiles(Project project) {
+        UIState state = uiStates.get(project);
+        if (state == null) return;
+        
+        state.selectedFilesPaths.clear();
+        state.selectedFilesModel.clear();
+        state.fileContentsCache.clear();
     }
 
 
@@ -767,7 +1190,35 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         updateResult(state.chatHistory.toString(), project);
 
         CodeService codeService = new CodeService();
-        String prompt = String.format("根据提出的问题作出回答，用中文回答；若需编程，请给出示例，以Java作为默认编程语言输出；问题如下：%s", CODE_UTIL.formatCode(question));
+        
+        // 构建包含上下文文件的提示词
+        StringBuilder promptBuilder = new StringBuilder();
+        
+        // 添加上下文文件内容
+        if (!state.selectedFilesPaths.isEmpty()) {
+            promptBuilder.append("以下是相关的上下文文件内容，请结合这些文件内容来回答问题：\n\n");
+            
+            for (String filePath : state.selectedFilesPaths) {
+                String content = state.fileContentsCache.get(filePath);
+                if (content != null) {
+                    String fileName = filePath.substring(filePath.lastIndexOf('/') + 1);
+                    promptBuilder.append("### 文件: ").append(fileName).append("\n");
+                    promptBuilder.append("```\n").append(content).append("\n```\n\n");
+                }
+            }
+            
+            promptBuilder.append("---\n\n");
+        }
+        
+        // 添加用户问题
+        promptBuilder.append("问题：").append(question).append("\n\n");
+        promptBuilder.append("请根据提出的问题作出回答，用中文回答；若需编程，请给出示例，以Java作为默认编程语言输出");
+        if (!state.selectedFilesPaths.isEmpty()) {
+            promptBuilder.append("；如果上下文文件与问题相关，请结合文件内容进行分析和回答");
+        }
+        promptBuilder.append("。");
+        
+        String prompt = promptBuilder.toString();
 
         try {
             ProgressManager.getInstance().run(new Task.Backgroundable(project, "处理中", true) {
