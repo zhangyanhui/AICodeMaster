@@ -12,8 +12,10 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @State(name = "com.yohannzhang.aigit.config.ApiKeySettings", storages = {@Storage("AICodeMasterettings.xml")})
 public class ApiKeySettings implements PersistentStateComponent<ApiKeySettings> {
@@ -30,6 +32,7 @@ public class ApiKeySettings implements PersistentStateComponent<ApiKeySettings> 
     private PromptInfo customPrompt = new PromptInfo("", "");
 
     private Map<String, ModuleConfig> moduleConfigs = new HashMap<>();
+    private Map<String, List<String>> customClientModules = new HashMap<>();
 
     public static ApiKeySettings getInstance() {
         return ApplicationManager.getApplication().getService(ApiKeySettings.class);
@@ -37,20 +40,17 @@ public class ApiKeySettings implements PersistentStateComponent<ApiKeySettings> 
 
     //获取apikey不为空的模型列表,按以下格式返回 new String[]{}
     public String[] getAvailableModels() {
-        String[] result = new String[moduleConfigs.size()];
-        int i = 0;
-        for (Map.Entry<String, ModuleConfig> entry : moduleConfigs.entrySet()) {
-            ModuleConfig config = entry.getValue();
-            if (config != null && config.getApiKey() != null && !config.getApiKey().isEmpty()) {
-                result[i] = entry.getKey();
-                i++;
+        ensureDefaultModuleConfigs();
+
+        Set<String> result = new LinkedHashSet<>();
+        for (String client : Constants.LLM_CLIENTS) {
+            if (moduleConfigs.containsKey(client)) {
+                result.add(client);
             }
         }
-        if (result == null || result.length == 0) {
-            result = Constants.LLM_CLIENTS;
-        }
+        result.addAll(moduleConfigs.keySet());
 
-        return result;
+        return result.toArray(new String[0]);
     }
 
 
@@ -63,6 +63,7 @@ public class ApiKeySettings implements PersistentStateComponent<ApiKeySettings> 
     @Override
     public void loadState(@NotNull ApiKeySettings state) {
         XmlSerializerUtil.copyBean(state, this);
+        ensureDefaultModuleConfigs();
     }
 
     public String getSelectedClient() {
@@ -117,11 +118,77 @@ public class ApiKeySettings implements PersistentStateComponent<ApiKeySettings> 
     }
 
     public Map<String, ModuleConfig> getModuleConfigs() {
+        ensureDefaultModuleConfigs();
         return moduleConfigs;
     }
 
     public void setModuleConfigs(Map<String, ModuleConfig> moduleConfigs) {
         this.moduleConfigs = moduleConfigs;
+        ensureDefaultModuleConfigs();
+    }
+
+    public Map<String, List<String>> getCustomClientModules() {
+        if (customClientModules == null) {
+            customClientModules = new HashMap<>();
+        }
+        return customClientModules;
+    }
+
+    public void setCustomClientModules(Map<String, List<String>> customClientModules) {
+        this.customClientModules = customClientModules;
+    }
+
+    public String[] getModulesForClient(String client) {
+        List<String> modules = new ArrayList<>();
+        String[] defaultModules = Constants.CLIENT_MODULES.get(client);
+        if (defaultModules != null) {
+            for (String module : defaultModules) {
+                addIfAbsent(modules, module);
+            }
+        }
+        List<String> customModules = getCustomClientModules().get(client);
+        if (customModules != null) {
+            for (String module : customModules) {
+                addIfAbsent(modules, module);
+            }
+        }
+        return modules.toArray(new String[0]);
+    }
+
+    public void addCustomModule(String client, String module) {
+        if (client == null || module == null || module.trim().isEmpty()) {
+            return;
+        }
+        String normalizedModule = module.trim();
+        String[] defaultModules = Constants.CLIENT_MODULES.get(client);
+        if (defaultModules != null) {
+            for (String defaultModule : defaultModules) {
+                if (normalizedModule.equals(defaultModule)) {
+                    return;
+                }
+            }
+        }
+
+        List<String> modules = getCustomClientModules().computeIfAbsent(client, key -> new ArrayList<>());
+        addIfAbsent(modules, normalizedModule);
+    }
+
+    private void addIfAbsent(List<String> modules, String module) {
+        if (module != null && !module.trim().isEmpty() && !modules.contains(module.trim())) {
+            modules.add(module.trim());
+        }
+    }
+
+    private void ensureDefaultModuleConfigs() {
+        if (moduleConfigs == null) {
+            moduleConfigs = new HashMap<>();
+        }
+        for (Map.Entry<String, ModuleConfig> entry : Constants.moduleConfigs.entrySet()) {
+            moduleConfigs.computeIfAbsent(entry.getKey(), key -> {
+                ModuleConfig defaultConfig = entry.getValue();
+                return new ModuleConfig(defaultConfig.getUrl(), defaultConfig.getApiKey());
+            });
+        }
     }
 
     public static class ModuleConfig {

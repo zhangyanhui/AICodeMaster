@@ -72,54 +72,37 @@ public class PromptUtil {
 
     private static String getDefaultPrompt() {
         return """
-                You are an AI assistant tasked with generating a Git commit message based on the provided code changes. Your goal is to create a clear, concise, and informative commit message that follows best practices.
+                你是一个Git提交信息生成专家。请分析以下代码变更并生成清晰、标准化的提交信息（{language}）。
                 
-                Input:
-                - Code diff:
-                ```
+                代码变更：
                 {diff}
-                ```
                 
-                Instructions:
-                1. Analyze the provided code diff and branch name.
-                2. Generate a commit message following this format:
-                   - First line: A short, imperative summary (50 characters or less)
-                   - Blank line
-                   - Detailed explanation (if necessary), wrapped at 72 characters
-                3. The commit message should:
-                   - Be clear and descriptive
-                   - Use the imperative mood in the subject line (e.g., "Add feature" not "Added feature")
-                   - Explain what and why, not how
-                   - Reference relevant issue numbers if applicable
-                4. Avoid:
-                   - Generic messages like "Bug fix" or "Update file.txt"
-                   - Mentioning obvious details that can be seen in the diff
-                
-                Output:
-                - Provide only the commit message, without any additional explanation or commentary.
-                
-                Output Structure:
-                <type>[optional scope]: <description>
-                [optional body]
-                Example:
-                   feat(api): add endpoint for user authentication
-                Possible scopes (examples, infer from diff context):
-                - api: app API-related code
-                - ui: user interface changes
-                - db: database-related changes
-                - etc.
-                Possible types:
-                   - fix, use this if you think the code fixed something
-                   - feat, use this if you think the code creates a new feature
-                   - perf, use this if you think the code makes performance improvements
-                   - docs, use this if you think the code does anything related to documentation
-                   - refactor, use this if you think that the change is simple a refactor but the functionality is the same
-                   - test, use this if this change is related to testing code (.spec, .test, etc)
-                   - chore, use this for code related to maintenance tasks, build processes, or other non-user-facing changes. It typically includes tasks that don't directly impact the functionality but are necessary for the project's development and maintenance.
-                   - ci, use this if this change is for CI related stuff
-                   - revert, use this if im reverting something
-                
-                Note: The whole result should be given in {language} and the final result must not contain ‘```’
+                提交信息要求：
+                1. 首行必须以以下类型开头：
+                   feat:（新功能）
+                   fix:（修复缺陷）
+                   docs:（文档）
+                   style:（格式调整）
+                   refactor:（代码重构）
+                   perf:（性能优化）
+                   test:（测试）
+                   chore:（维护）
+                2. 首行长度不得超过72个字符。
+                3. 如需详细说明，请说明：
+                   - 此变更为何必要？
+                   - 如何解决问题？
+                   - 是否有破坏性变更？
+                4. 使用现在时态。
+                5. 请仅输出提交信息，不包含其他内容。
+                6. commit message 中须在最后标注 【AI辅助】*。
+
+                示例（Java）：
+                fix: 修复用户登录时的空指针异常
+
+                此变更解决了在用户未提供密码时抛出的NullPointerException。
+                通过在验证逻辑中添加空值检查，确保系统在异常输入下仍能正常运行。
+
+                【AI辅助】*
                 """;
     }
 

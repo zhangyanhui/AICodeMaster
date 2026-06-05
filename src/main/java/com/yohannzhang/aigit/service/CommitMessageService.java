@@ -47,6 +47,7 @@ public class CommitMessageService {
             case Constants.CloudflareWorkersAI -> new CloudflareWorkersAIService();
             case Constants.阿里云百炼 -> new AliYunBaiLianService();
             case Constants.SiliconFlow -> new SiliconFlowService();
+            case Constants.VLLM -> new VllmService();
             default -> throw new IllegalArgumentException("Invalid LLM client: " + selectedClient);
         };
     }

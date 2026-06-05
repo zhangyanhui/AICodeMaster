@@ -11,15 +11,22 @@
          --idefont-color: #2B2B2B; /* 定义工作空间颜色 */
 
           }
+        html,
+        body {
+            min-height: 100%;
+            background-color: var(--workspace-color);
+        }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            line-height: 1.6;
+            line-height: 1.55;
             margin: 0;
-            padding: 20px;
-           background-color: var(--workspace-color);
-           color: var(--idefont-color);
+            padding: 14px 16px 22px;
+            color: var(--idefont-color);
             font-size: var(--font-size);
-}
+        }
+        #content {
+            max-width: 920px;
+            margin: 0 auto;
         }
         .markdown-body {
             width: 100%;
@@ -28,21 +35,24 @@
         }
         pre {
             position: relative;
-            padding-top: 28px;
+            padding-top: 26px;
+            border: 1px solid rgba(127,127,127,0.18);
+            border-radius: 6px;
+            overflow: hidden;
         }
         code {
             font-family: 'Fira Code', 'JetBrains Mono', 'Courier New', monospace;
         }
         .copy-btn {
             position: absolute;
-            top: 5px;
-            right: 10px;
-            background: #444;
-            color: white;
+            top: 8px;
+            right: 8px;
+            background: rgba(80, 86, 94, 0.92);
+            color: #fff;
             border: none;
-            padding: 6px 12px;
-            font-size: 14px;
-            border-radius: 3px;
+            padding: 4px 9px;
+            font-size: 12px;
+            border-radius: 4px;
             cursor: pointer;
             transition: background-color 0.2s ease;
         }
@@ -53,26 +63,112 @@
             background: #888;
         }
         pre code {
-            background-color: #1e1e1e;
-            color: #dcdcdc;
+            background-color: rgba(127,127,127,0.10);
+            color: #e5e7eb;
             display: block;
-            padding: 1em;
-            border-radius: 5px;
+            padding: 13px 14px;
+            border-radius: 0;
             overflow-x: auto;
         }
- .welcome-container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
-        .welcome-header { text-align: center; margin-bottom: 40px; }
-        .welcome-title { font-size: 32px; margin-bottom: 12px; font-weight: 600; }
-        .welcome-subtitle { font-size: 18px; opacity: 0.8; }
-        .welcome-content { text-align: center; margin-top: 40px; }
-        .welcome-text { font-size: 16px; line-height: 2.0; margin-bottom: 20px; }
-        .feature-item { display: flex; align-items: center; justify-content: center; margin: 12px 0; }
-        .feature-icon { margin-right: 12px; font-size: 20px; }
+        .welcome-container { max-width: 720px; margin: 0 auto; padding: 42px 18px; }
+        .welcome-header { text-align: left; margin-bottom: 26px; }
+        .welcome-kicker { font-size: 12px; letter-spacing: 0; text-transform: uppercase; color: rgba(127,127,127,0.88); margin-bottom: 10px; }
+        .welcome-title { font-size: 24px; margin-bottom: 8px; font-weight: 650; }
+        .welcome-subtitle { max-width: 560px; font-size: 14px; line-height: 1.7; opacity: 0.74; }
+        .welcome-content { margin-top: 24px; border-top: 1px solid rgba(127,127,127,0.18); }
+        .welcome-text { font-size: 14px; line-height: 1.65; margin-bottom: 20px; }
+        .feature-item { display: grid; grid-template-columns: 42px 1fr; gap: 12px; padding: 13px 0; border-bottom: 1px solid rgba(127,127,127,0.13); }
+        .feature-icon { font-family: 'JetBrains Mono', 'Courier New', monospace; font-size: 12px; color: rgba(127,127,127,0.88); padding-top: 1px; }
         .feature-text { text-align: left; }
-        .delete-btn:hover { color: #ff6b6b !important; background-color: rgba(255, 107, 107, 0.1); }
-        .chat-item { position: relative; }
+        .feature-title { display: block; font-weight: 650; margin-bottom: 3px; }
+        .feature-desc { display: block; opacity: 0.68; }
+        .message-row { display: flex; margin: 12px 0 14px; }
+        .question-item { justify-content: flex-end; }
+        .answer-item { justify-content: flex-start; }
+        .message-bubble {
+            position: relative;
+            max-width: 88%;
+            min-width: 120px;
+            border: 1px solid rgba(127,127,127,0.18);
+            border-radius: 6px;
+            padding: 9px 11px;
+            background: rgba(127,127,127,0.045);
+        }
+        .question-item .message-bubble {
+            max-width: 78%;
+            background: rgba(72, 134, 237, 0.12);
+            border-color: rgba(72, 134, 237, 0.28);
+        }
+        .answer-item .message-bubble {
+            max-width: 100%;
+            width: 100%;
+            background: transparent;
+            border-color: rgba(127,127,127,0.12);
+        }
+        .message-meta {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 6px;
+            font-size: 12px;
+            color: rgba(127,127,127,0.88);
+        }
+        .message-role {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: 650;
+            color: var(--idefont-color);
+        }
+        .role-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .question-item .role-dot { background: #4886ed; }
+        .answer-item .role-dot { background: #8a8f98; }
+        .message-actions { display: flex; align-items: center; gap: 8px; }
+        .message-content { word-break: break-word; overflow-wrap: anywhere; }
+        .message-content p:first-child { margin-top: 0; }
+        .message-content p:last-child { margin-bottom: 0; }
+        .message-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0 12px;
+            display: block;
+            overflow-x: auto;
+            white-space: nowrap;
+        }
+        .message-content th,
+        .message-content td {
+            border: 1px solid rgba(127,127,127,0.24);
+            padding: 7px 9px;
+            text-align: left;
+            vertical-align: top;
+        }
+        .message-content th {
+            background: rgba(127,127,127,0.10);
+            font-weight: 650;
+        }
+        .message-content tr:nth-child(even) td {
+            background: rgba(127,127,127,0.035);
+        }
+        .chat-separator { border: none; border-top: 1px solid rgba(127,127,127,0.13); margin: 14px 0 18px; }
+        .delete-btn {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            border: none;
+            background: transparent;
+            color: rgba(127,127,127,0.9);
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.16s, color 0.16s, background-color 0.16s;
+        }
         .chat-item:hover .delete-btn { opacity: 1; }
-        .delete-btn { opacity: 0; transition: opacity 0.2s, color 0.2s, background-color 0.2s; }
+        .delete-btn:hover { color: #d73a49 !important; background-color: rgba(215, 58, 73, 0.12); }
 pre code.hljs{display:block;overflow-x:auto;padding:1em}code.hljs{padding:3px 5px}.hljs{background:#f3f3f3;color:#444}.hljs-comment{color:#697070}.hljs-punctuation,.hljs-tag{color:#444a}.hljs-tag .hljs-attr,.hljs-tag .hljs-name{color:#444}.hljs-attribute,.hljs-doctag,.hljs-keyword,.hljs-meta .hljs-keyword,.hljs-name,.hljs-selector-tag{font-weight:700}.hljs-deletion,.hljs-number,.hljs-quote,.hljs-selector-class,.hljs-selector-id,.hljs-string,.hljs-template-tag,.hljs-type{color:#800}.hljs-section,.hljs-title{color:#800;font-weight:700}.hljs-link,.hljs-operator,.hljs-regexp,.hljs-selector-attr,.hljs-selector-pseudo,.hljs-symbol,.hljs-template-variable,.hljs-variable{color:#ab5656}.hljs-literal{color:#695}.hljs-addition,.hljs-built_in,.hljs-bullet,.hljs-code{color:#397300}.hljs-meta{color:#1f7199}.hljs-meta .hljs-string{color:#38a}.hljs-emphasis{font-style:italic}.hljs-strong{font-weight:700}
     </style>
     <!-- 引入 highlight.js -->
@@ -1286,37 +1382,40 @@ return je}()
 <div id='content'>
     <div class='welcome-container'>
         <div class='welcome-header'>
-            <div class='welcome-title'>AI 编程助手</div>
-            <div class='welcome-subtitle'>智能编程，高效开发</div>
+            <div class='welcome-kicker'>DevPilot</div>
+            <div class='welcome-title'>代码上下文工作台</div>
+            <div class='welcome-subtitle'>选择代码、引用文件或直接提问。回答会保留在当前会话中，最近 6 轮对话会作为上下文继续参与分析。</div>
         </div>
         <div class='welcome-content'>
             <div class='welcome-text'>
                 <div class='feature-item'>
-                    <span class='feature-icon'>&#x2728;</span>
-                    <!-- ✨ -->
-                    <span class='feature-text'>代码分析优化</span>
+                    <span class='feature-icon'>01</span>
+                    <span class='feature-text'>
+                        <span class='feature-title'>定位问题</span>
+                        <span class='feature-desc'>结合选中代码、上下文文件和报错信息，整理原因与修改建议。</span>
+                    </span>
                 </div>
                 <div class='feature-item'>
-                    <span class='feature-icon'>&#x1F50D;</span>
-                    <!-- 🔍 -->
-                    <span class='feature-text'>问题诊断修复</span>
+                    <span class='feature-icon'>02</span>
+                    <span class='feature-text'>
+                        <span class='feature-title'>解释代码</span>
+                        <span class='feature-desc'>按调用关系、数据流和边界条件说明当前实现。</span>
+                    </span>
                 </div>
                 <div class='feature-item'>
-                    <span class='feature-icon'>&#x1F680;</span>
-                    <!-- 🚀 -->
-                    <span class='feature-text'>代码重构优化</span>
+                    <span class='feature-icon'>03</span>
+                    <span class='feature-text'>
+                        <span class='feature-title'>生成改动</span>
+                        <span class='feature-desc'>输出可落地的实现片段、测试建议和必要的注意事项。</span>
+                    </span>
                 </div>
                 <div class='feature-item'>
-                    <span class='feature-icon'>&#x1F4A1;</span>
-                    <!-- 💡 -->
-                    <span class='feature-text'>最佳实践指导</span>
+                    <span class='feature-icon'>04</span>
+                    <span class='feature-text'>
+                        <span class='feature-title'>整理提交</span>
+                        <span class='feature-desc'>基于 diff 生成规范的提交信息，减少提交前的重复整理。</span>
+                    </span>
                 </div>
-                <div class='feature-item'>
-                    <span class='feature-icon'>&#x1F916;</span>
-                    <!-- 🤖 -->
-                    <span class='feature-text'>智能代码补全</span>
-                </div>
-
             </div>
         </div>
     </div>

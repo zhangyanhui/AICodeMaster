@@ -65,6 +65,7 @@ public class ApiKeyConfigurable implements Configurable {
         // 应用设置
         settings.setSelectedClient(selectedClient);
         settings.setSelectedModule(selectedModule);
+        settings.addCustomModule(selectedClient, selectedModule);
         settings.setCommitLanguage(commitLanguage);
 
         // 保存prompt内容
@@ -90,6 +91,10 @@ public class ApiKeyConfigurable implements Configurable {
                 CombinedWindowFactory.UIState uiStateIState = combinedWindowFactory.uiStates.get(project);
                 if(uiStateIState!=null){
                     uiStateIState.modelComboBox.setSelectedItem(selectedClient);
+                    uiStateIState.modelSelectComboBox.removeAllItems();
+                    for (String module : settings.getModulesForClient(selectedClient)) {
+                        uiStateIState.modelSelectComboBox.addItem(module);
+                    }
                     uiStateIState.modelSelectComboBox.setSelectedItem(selectedModule);
                 }
 

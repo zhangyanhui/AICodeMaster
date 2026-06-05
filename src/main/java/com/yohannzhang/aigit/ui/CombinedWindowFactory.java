@@ -27,6 +27,7 @@ import com.intellij.ui.components.JBTextField;
 import com.intellij.ui.content.Content;
 import com.intellij.ui.jcef.JBCefBrowser;
 import com.intellij.util.messages.MessageBusConnection;
+import com.vladsch.flexmark.ext.tables.TablesExtension;
 import com.vladsch.flexmark.html.HtmlRenderer;
 import com.vladsch.flexmark.parser.Parser;
 import com.vladsch.flexmark.util.data.MutableDataSet;
@@ -42,12 +43,16 @@ import com.yohannzhang.aigit.util.OpenAIUtil;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
+import javax.swing.border.LineBorder;
+import javax.swing.text.DefaultCaret;
 import java.awt.*;
 import java.awt.event.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -58,6 +63,8 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
     private static final Font BUTTON_FONT = new Font("SansSerif", Font.BOLD, 14);
     private static final Color BUTTON_COLOR = new Color(32, 86, 105);
     private static final Color BUTTON_HOVER_COLOR = new Color(143, 0, 200);
+    private static final int MAX_CONVERSATION_CONTEXT_TURNS = 6;
+    private static final String QUESTION_PLACEHOLDER = "向 DevPilot 提问，Enter 发送，Alt+Enter 换行";
 
     //    private JTextArea questionTextArea;
 //    private JPanel outputPanel;
@@ -89,6 +96,7 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         JBCefBrowser markdownViewer;
         StringBuilder chatHistory = new StringBuilder();
         StringBuilder currentAnswer = new StringBuilder();
+        List<ConversationTurn> conversationTurns = new ArrayList<>();
         boolean isHistoryView = false;
         JPanel historyPanel;
         DefaultListModel<HistoryItem> historyListModel;
@@ -110,8 +118,19 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         JBScrollPane fileListScrollPane;
     }
 
+    private static class ConversationTurn {
+        private final String question;
+        private final String answer;
+
+        private ConversationTurn(String question, String answer) {
+            this.question = question;
+            this.answer = answer;
+        }
+    }
+
     static {
         MutableDataSet options = new MutableDataSet();
+        options.set(Parser.EXTENSIONS, List.of(TablesExtension.create()));
         parser = Parser.builder(options).build();
         renderer = HtmlRenderer.builder(options).build();
     }
@@ -206,8 +225,7 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
 
         // 更新问题输入区域
         if (state.questionTextArea != null) {
-            state.questionTextArea.setBackground(ideBackgroundColor);
-            state.questionTextArea.setForeground(ideFontColor);
+            applyQuestionTextAreaColors(state.questionTextArea, !isQuestionPlaceholder(state.questionTextArea.getText()));
         }
 
         // 更新历史面板
@@ -284,6 +302,27 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         fontSize = scheme.getEditorFontSize();
     }
 
+    private Color subtleFill(int alpha) {
+        return blendWithIdeBackground(new Color(127, 127, 127), alpha);
+    }
+
+    private Color subtleLine(int alpha) {
+        return blendWithIdeBackground(new Color(127, 127, 127), alpha);
+    }
+
+    private Color accentFill(Color color, int alpha) {
+        return blendWithIdeBackground(color, alpha);
+    }
+
+    private Color blendWithIdeBackground(Color overlay, int alpha) {
+        Color background = ideBackgroundColor != null ? ideBackgroundColor : Color.WHITE;
+        double ratio = Math.max(0, Math.min(255, alpha)) / 255.0;
+        int red = (int) Math.round(overlay.getRed() * ratio + background.getRed() * (1.0 - ratio));
+        int green = (int) Math.round(overlay.getGreen() * ratio + background.getGreen() * (1.0 - ratio));
+        int blue = (int) Math.round(overlay.getBlue() * ratio + background.getBlue() * (1.0 - ratio));
+        return new Color(red, green, blue);
+    }
+
     public void updateResult(String markdownResult, Project project) {
         UIState state = getOrCreateState(project);
         if (state.markdownViewer == null) return;
@@ -335,6 +374,8 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
                 .setUrl("about:blank")
                 .build();
         state.markdownViewer.getComponent().setBorder(BorderFactory.createEmptyBorder());
+        state.markdownViewer.getComponent().setBackground(ideBackgroundColor);
+        state.markdownViewer.getComponent().setForeground(ideFontColor);
 
         String welcomeHtml = HtmlTemplateReplacer.replaceCssVariables("empty.html", fontSize, ideBackgroundColor, ideFontColor);
 
@@ -365,61 +406,66 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         }
     }
 
-    private static class HistoryListCellRenderer extends DefaultListCellRenderer {
+    private static class HistoryListCellRenderer extends JPanel implements ListCellRenderer<HistoryItem> {
+        private final JLabel qLabel = new JLabel("Q:");
+        private final JLabel questionLabel = new JLabel();
+        private final JLabel timeLabel = new JLabel();
+        private final JPanel leftPanel = new JPanel(new BorderLayout(5, 0));
+
+        private HistoryListCellRenderer() {
+            super(new BorderLayout(5, 5));
+            setOpaque(true);
+            setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
+
+            qLabel.setFont(new Font("SansSerif", Font.BOLD, 14));
+            qLabel.setForeground(new Color(76, 175, 80));
+            qLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 5));
+
+            questionLabel.setFont(new Font("SansSerif", Font.PLAIN, 14));
+            timeLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
+
+            leftPanel.setOpaque(true);
+            leftPanel.add(qLabel, BorderLayout.WEST);
+            leftPanel.add(questionLabel, BorderLayout.CENTER);
+
+            add(leftPanel, BorderLayout.CENTER);
+            add(timeLabel, BorderLayout.EAST);
+        }
+
         @Override
-        public Component getListCellRendererComponent(JList<?> list, Object value,
+        public Component getListCellRendererComponent(JList<? extends HistoryItem> list, HistoryItem value,
                                                       int index, boolean isSelected, boolean cellHasFocus) {
-            super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+            Color background = isSelected ? list.getSelectionBackground() : list.getBackground();
+            Color foreground = isSelected ? list.getSelectionForeground() : list.getForeground();
 
-            if (value instanceof HistoryItem) {
-                HistoryItem item = (HistoryItem) value;
-                JPanel panel = new JPanel(new BorderLayout(5, 5));
-                panel.setBackground(isSelected ? list.getSelectionBackground() : list.getBackground());
-                panel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
+            setBackground(background);
+            leftPanel.setBackground(background);
+            questionLabel.setForeground(foreground);
+            timeLabel.setForeground(isSelected ? foreground : new Color(128, 128, 128));
 
-                // 创建问题标签
-                JLabel questionLabel = new JLabel(item.question);
-                questionLabel.setFont(new Font("SansSerif", Font.PLAIN, 14));
-                questionLabel.setForeground(isSelected ? list.getSelectionForeground() : list.getForeground());
-
-                // 创建时间戳标签
-                JLabel timeLabel = new JLabel(item.timestamp);
-                timeLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
-                timeLabel.setForeground(isSelected ? list.getSelectionForeground() : new Color(128, 128, 128));
-
-                // 添加左侧的Q标记
-                JLabel qLabel = new JLabel("Q:");
-                qLabel.setFont(new Font("SansSerif", Font.BOLD, 14));
-                qLabel.setForeground(new Color(76, 175, 80)); // 绿色
-                qLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 5));
-
-                // 创建左侧面板
-                JPanel leftPanel = new JPanel(new BorderLayout(5, 0));
-                leftPanel.setBackground(panel.getBackground());
-                leftPanel.add(qLabel, BorderLayout.WEST);
-                leftPanel.add(questionLabel, BorderLayout.CENTER);
-
-                panel.add(leftPanel, BorderLayout.CENTER);
-                panel.add(timeLabel, BorderLayout.EAST);
-
-                return panel;
+            if (value != null) {
+                questionLabel.setText(value.question);
+                timeLabel.setText(value.timestamp);
+            } else {
+                questionLabel.setText("");
+                timeLabel.setText("");
             }
-
             return this;
         }
     }
 
     private JPanel createInputPanel(Project project) {
         UIState state = getOrCreateState(project);
-        JPanel inputPanel = new JPanel(new BorderLayout(1, 1));
+        JPanel inputPanel = new JPanel(new BorderLayout());
         inputPanel.setBackground(ideBackgroundColor);
+        inputPanel.setBorder(BorderFactory.createEmptyBorder(8, 10, 10, 10));
 
         // 创建统一的输入容器
         JPanel unifiedInputContainer = new JPanel(new BorderLayout());
-        unifiedInputContainer.setBackground(ideBackgroundColor);
+        unifiedInputContainer.setBackground(subtleFill(10));
         unifiedInputContainer.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(200, 200, 200), 1),
-                BorderFactory.createEmptyBorder(2, 2, 2, 2)
+                new LineBorder(subtleLine(78), 1, true),
+                BorderFactory.createEmptyBorder(7, 8, 7, 8)
         ));
 
         // 创建上下文文件区域（放在顶部）
@@ -429,41 +475,35 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         JTextArea questionTextArea = new JTextArea(3, 50);
         questionTextArea.setLineWrap(true);
         questionTextArea.setWrapStyleWord(true);
-        questionTextArea.setBackground(ideBackgroundColor);
-        questionTextArea.setForeground(new Color(180, 180, 180));
-        questionTextArea.requestFocusInWindow();
-        questionTextArea.setBorder(BorderFactory.createEmptyBorder(12, 16, 30, 16)); // 精细调整底部间距
+        questionTextArea.setFont(new Font("SansSerif", Font.PLAIN, 13));
+        questionTextArea.setBorder(BorderFactory.createEmptyBorder(6, 2, 8, 2));
+        questionTextArea.setOpaque(true);
+        questionTextArea.getCaret().setBlinkRate(0);
+        if (questionTextArea.getCaret() instanceof DefaultCaret caret) {
+            caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
+        }
 
-        String placeholderText = "输入问题，点击提交按钮发送";
+        String placeholderText = QUESTION_PLACEHOLDER;
         questionTextArea.setText(placeholderText);
+        applyQuestionTextAreaColors(questionTextArea, false);
 
         questionTextArea.addFocusListener(new FocusAdapter() {
             @Override
             public void focusGained(FocusEvent e) {
-                SwingUtilities.invokeLater(() -> {
-                    String currentText = questionTextArea.getText();
-                    Color currentColor = questionTextArea.getForeground();
-                    Color placeholderColor = new Color(180, 180, 180);
-                    
-                    // 更精确的placeholder检测：检查文本内容和颜色状态
-                    if (currentText.equals(placeholderText) || 
-                        currentText.trim().equals(placeholderText.trim()) ||
-                        (currentColor != null && currentColor.equals(placeholderColor))) {
-                        questionTextArea.setText("");
-                        questionTextArea.setForeground(ideFontColor);
-                    }
-                });
+                if (isQuestionPlaceholder(questionTextArea.getText())) {
+                    questionTextArea.setText("");
+                }
+                applyQuestionTextAreaColors(questionTextArea, true);
             }
 
             @Override
             public void focusLost(FocusEvent e) {
-                SwingUtilities.invokeLater(() -> {
-                    String currentText = questionTextArea.getText();
-                    if (currentText == null || currentText.trim().isEmpty()) {
-                        questionTextArea.setText(placeholderText);
-                        questionTextArea.setForeground(new Color(180, 180, 180));
-                    }
-                });
+                if (questionTextArea.getText() == null || questionTextArea.getText().trim().isEmpty()) {
+                    questionTextArea.setText(placeholderText);
+                    applyQuestionTextAreaColors(questionTextArea, false);
+                } else {
+                    applyQuestionTextAreaColors(questionTextArea, true);
+                }
             }
         });
 
@@ -471,19 +511,10 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         questionTextArea.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
-                SwingUtilities.invokeLater(() -> {
-                    String currentText = questionTextArea.getText();
-                    Color currentColor = questionTextArea.getForeground();
-                    Color placeholderColor = new Color(180, 180, 180);
-                    
-                    if (currentText.equals(placeholderText) || 
-                        currentText.trim().equals(placeholderText.trim()) ||
-                        (currentColor != null && currentColor.equals(placeholderColor))) {
-                        questionTextArea.setText("");
-                        questionTextArea.setForeground(ideFontColor);
-                        questionTextArea.requestFocusInWindow();
-                    }
-                });
+                if (isQuestionPlaceholder(questionTextArea.getText())) {
+                    questionTextArea.setText("");
+                }
+                applyQuestionTextAreaColors(questionTextArea, true);
             }
         });
 
@@ -513,32 +544,34 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
 
         // 创建底部控制栏（模型选择 + 按钮）
         JPanel bottomControlPanel = new JPanel(new BorderLayout());
-        bottomControlPanel.setBackground(ideBackgroundColor);
-        bottomControlPanel.setBorder(BorderFactory.createEmptyBorder(0, 12, 4, 12)); // 减少上边距，贴近底部
+        bottomControlPanel.setBackground(subtleFill(0));
+        bottomControlPanel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(1, 0, 0, 0, subtleLine(38)),
+                BorderFactory.createEmptyBorder(7, 0, 0, 0)
+        ));
 
         // 左侧：模型选择区域
-        JPanel modelPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 2)); // 减少垂直间距
-        modelPanel.setBackground(ideBackgroundColor);
+        JPanel modelPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        modelPanel.setBackground(subtleFill(0));
 
         String[] clientArr = ApiKeySettings.getInstance().getAvailableModels();
         JComboBox<String> modelComboBox = new JComboBox<>(clientArr);
         modelComboBox.setSelectedItem(ApiKeySettings.getInstance().getSelectedClient());
-        modelComboBox.setPreferredSize(new Dimension(100, 24));
-        modelComboBox.setBackground(ideBackgroundColor);
-        modelComboBox.setForeground(ideFontColor);
+        modelComboBox.setPreferredSize(new Dimension(118, 26));
         modelComboBox.setFont(new Font("SansSerif", Font.PLAIN, 11));
 
-        String[] modelArr = Constants.CLIENT_MODULES.get(modelComboBox.getSelectedItem());
+        String[] modelArr = ApiKeySettings.getInstance().getModulesForClient((String) modelComboBox.getSelectedItem());
         JComboBox<String> modelSelectComboBox = new JComboBox<>(modelArr);
+        modelSelectComboBox.setEditable(true);
         modelSelectComboBox.setSelectedItem(ApiKeySettings.getInstance().getSelectedModule());
-        modelSelectComboBox.setPreferredSize(new Dimension(100, 24));
-        modelSelectComboBox.setBackground(ideBackgroundColor);
-        modelSelectComboBox.setForeground(ideFontColor);
+        modelSelectComboBox.setPreferredSize(new Dimension(160, 26));
         modelSelectComboBox.setFont(new Font("SansSerif", Font.PLAIN, 11));
+        applyComboBoxColors(modelComboBox);
+        applyComboBoxColors(modelSelectComboBox);
 
         modelComboBox.addActionListener(e -> {
             String selectedClient = (String) modelComboBox.getSelectedItem();
-            String[] arr = Constants.CLIENT_MODULES.get(modelComboBox.getSelectedItem());
+            String[] arr = ApiKeySettings.getInstance().getModulesForClient(selectedClient);
             modelSelectComboBox.removeAllItems();
             for (String module : arr) {
                 modelSelectComboBox.addItem(module);
@@ -549,28 +582,23 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         modelSelectComboBox.addActionListener(e -> {
             String selectedModel = (String) modelSelectComboBox.getSelectedItem();
             ApiKeySettings.getInstance().setSelectedModule(selectedModel);
+            ApiKeySettings.getInstance().addCustomModule((String) modelComboBox.getSelectedItem(), selectedModel);
         });
 
         modelPanel.add(modelComboBox);
         modelPanel.add(modelSelectComboBox);
 
         // 右侧：按钮区域
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 2)); // 减少垂直间距
-        buttonPanel.setBackground(ideBackgroundColor);
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
+        buttonPanel.setBackground(subtleFill(0));
 
-        JButton askButton = createCompactButton("提交");
-        JButton cancelButton = createCompactButton("取消");
-        cancelButton.setBackground(new Color(231, 76, 60));
-        cancelButton.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(231, 76, 60), 1),
-                BorderFactory.createEmptyBorder(3, 10, 3, 10)
-        ));
+        JButton askButton = createIconActionButton("/icons/fasong.png", "发送", ButtonStyle.PRIMARY);
+        JButton cancelButton = createActionButton("停止", ButtonStyle.DANGER);
         cancelButton.setVisible(false);
 
         askButton.addActionListener(e -> handleAskButtonClick(project));
         cancelButton.addActionListener(e -> handleCancel(project));
 
-        buttonPanel.add(askButton);
         buttonPanel.add(cancelButton);
 
         // 组装底部控制栏
@@ -579,13 +607,15 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
 
         // 创建文本区域容器，使用BorderLayout替代OverlayLayout
         JPanel textContainer = new JPanel(new BorderLayout());
-        textContainer.setBackground(ideBackgroundColor);
+        textContainer.setBackground(subtleFill(0));
 
         // 添加滚动面板
         JBScrollPane scrollPane = new JBScrollPane(questionTextArea);
         scrollPane.setBorder(null);
-        scrollPane.setBackground(ideBackgroundColor);
-        scrollPane.getViewport().setBackground(ideBackgroundColor);
+        scrollPane.setBackground(subtleFill(0));
+        scrollPane.getViewport().setBackground(subtleFill(0));
+        scrollPane.setOpaque(true);
+        scrollPane.getViewport().setOpaque(true);
 
         // 添加组件到容器
         textContainer.add(scrollPane, BorderLayout.CENTER);
@@ -598,8 +628,6 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         // 最终组装到主面板
         inputPanel.add(unifiedInputContainer, BorderLayout.CENTER);
 
-        refreshComponentBackground(inputPanel);
-
         // 保存到状态
         state.modelComboBox = modelComboBox;
         state.modelSelectComboBox = modelSelectComboBox;
@@ -610,40 +638,151 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         return inputPanel;
     }
 
-    private JButton createCompactButton(String text) {
+    private boolean isQuestionPlaceholder(String text) {
+        return text != null && text.trim().equals(QUESTION_PLACEHOLDER.trim());
+    }
+
+    private void applyQuestionTextAreaColors(JTextArea textArea, boolean editing) {
+        textArea.setBackground(subtleFill(0));
+        textArea.setForeground(editing ? getReadableTextColor() : new Color(180, 180, 180));
+        textArea.setCaretColor(getStableCaretColor());
+        textArea.setSelectedTextColor(getSelectionForegroundColor());
+        textArea.setSelectionColor(getSelectionBackgroundColor());
+        textArea.setOpaque(true);
+        textArea.getCaret().setBlinkRate(0);
+        textArea.getCaret().setVisible(textArea.hasFocus());
+    }
+
+    private void applyComboBoxColors(JComboBox<String> comboBox) {
+        Color background = subtleFill(18);
+        Color foreground = getReadableTextColor();
+        comboBox.setBackground(background);
+        comboBox.setForeground(foreground);
+        comboBox.setOpaque(true);
+
+        Component editorComponent = comboBox.getEditor().getEditorComponent();
+        if (editorComponent != null) {
+            editorComponent.setBackground(background);
+            editorComponent.setForeground(foreground);
+            if (editorComponent instanceof JTextField textField) {
+                textField.setCaretColor(getStableCaretColor());
+                textField.setSelectedTextColor(getSelectionForegroundColor());
+                textField.setSelectionColor(getSelectionBackgroundColor());
+                textField.setOpaque(true);
+                textField.setBorder(BorderFactory.createEmptyBorder(2, 4, 2, 4));
+            }
+        }
+    }
+
+    private Color getSelectionBackgroundColor() {
+        return isDark(ideBackgroundColor) ? new Color(55, 92, 135) : new Color(184, 207, 229);
+    }
+
+    private Color getSelectionForegroundColor() {
+        return isDark(ideBackgroundColor) ? Color.WHITE : Color.BLACK;
+    }
+
+    private Color getReadableTextColor() {
+        return hasUsableContrast(ideFontColor, ideBackgroundColor) ? ideFontColor : getStableCaretColor();
+    }
+
+    private Color getStableCaretColor() {
+        return isDark(ideBackgroundColor) ? new Color(235, 235, 235) : new Color(32, 32, 32);
+    }
+
+    private boolean hasUsableContrast(Color foreground, Color background) {
+        if (foreground == null || background == null) {
+            return false;
+        }
+        return Math.abs(luminance(foreground) - luminance(background)) >= 80;
+    }
+
+    private boolean isDark(Color color) {
+        return color != null && luminance(color) < 128;
+    }
+
+    private int luminance(Color color) {
+        return (int) Math.round(color.getRed() * 0.299 + color.getGreen() * 0.587 + color.getBlue() * 0.114);
+    }
+
+    private enum ButtonStyle {
+        PRIMARY,
+        SECONDARY,
+        DANGER
+    }
+
+    private JButton createActionButton(String text, ButtonStyle style) {
         JButton button = new JButton(text);
-        button.setFont(new Font("SansSerif", Font.BOLD, 11));
+        button.setFont(new Font("SansSerif", Font.BOLD, 12));
         button.setOpaque(true);
         button.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        button.setPreferredSize(new Dimension(50, 24));
+        button.setPreferredSize(new Dimension(text.length() > 2 ? 84 : 58, 28));
         button.setFocusPainted(false);
+        button.setContentAreaFilled(true);
+        applyButtonStyle(button, style, false);
 
-        // 设置默认样式
-        button.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(214, 236, 221), 1),
-                BorderFactory.createEmptyBorder(3, 10, 3, 10)
-        ));
-
-        // 添加鼠标事件
         button.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseEntered(MouseEvent e) {
-                button.setBorder(BorderFactory.createCompoundBorder(
-                        BorderFactory.createLineBorder(new Color(52, 152, 219), 1),
-                        BorderFactory.createEmptyBorder(3, 10, 3, 10)
-                ));
+                applyButtonStyle(button, style, true);
             }
 
             @Override
             public void mouseExited(MouseEvent e) {
-                button.setBorder(BorderFactory.createCompoundBorder(
-                        BorderFactory.createLineBorder(new Color(214, 236, 221), 1),
-                        BorderFactory.createEmptyBorder(3, 10, 3, 10)
-                ));
+                applyButtonStyle(button, style, false);
             }
         });
 
         return button;
+    }
+
+    private JButton createIconActionButton(String iconPath, String tooltip, ButtonStyle style) {
+        JButton button = createActionButton("", style);
+        button.setToolTipText(tooltip);
+        button.setPreferredSize(new Dimension(34, 28));
+        button.setText(null);
+
+        java.net.URL iconUrl = getClass().getResource(iconPath);
+        if (iconUrl != null) {
+            ImageIcon sourceIcon = new ImageIcon(iconUrl);
+            Image scaledImage = sourceIcon.getImage().getScaledInstance(16, 16, Image.SCALE_SMOOTH);
+            button.setIcon(new ImageIcon(scaledImage));
+        } else {
+            button.setText(tooltip);
+        }
+
+        return button;
+    }
+
+    private void applyButtonStyle(JButton button, ButtonStyle style, boolean hovered) {
+        Color borderColor;
+        Color backgroundColor;
+        Color foregroundColor;
+
+        switch (style) {
+            case PRIMARY -> {
+                borderColor = hovered ? new Color(72, 134, 237, 160) : new Color(72, 134, 237, 130);
+                backgroundColor = hovered ? new Color(54, 117, 214) : new Color(72, 134, 237);
+                foregroundColor = Color.WHITE;
+            }
+            case DANGER -> {
+                borderColor = hovered ? accentFill(new Color(215, 58, 73), 135) : subtleLine(70);
+                backgroundColor = hovered ? accentFill(new Color(215, 58, 73), 28) : subtleFill(18);
+                foregroundColor = hovered ? new Color(215, 58, 73) : ideFontColor;
+            }
+            default -> {
+                borderColor = hovered ? accentFill(new Color(72, 134, 237), 120) : subtleLine(70);
+                backgroundColor = hovered ? accentFill(new Color(72, 134, 237), 20) : subtleFill(18);
+                foregroundColor = ideFontColor;
+            }
+        }
+
+        button.setForeground(foregroundColor);
+        button.setBackground(backgroundColor);
+        button.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(borderColor, 1),
+                BorderFactory.createEmptyBorder(4, 12, 4, 12)
+        ));
     }
     
     /**
@@ -651,28 +790,44 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
      */
     private JButton createCompactFileButton(String text) {
         JButton button = new JButton(text);
-        button.setFont(new Font("SansSerif", Font.PLAIN, 11));
-        button.setOpaque(false);
+        button.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        button.setOpaque(true);
         button.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        button.setPreferredSize(new Dimension(text.equals("选择文件") ? 60 : 35, 22));
+        button.setPreferredSize(new Dimension(text.equals("选择文件") ? 76 : 48, 24));
         button.setFocusPainted(false);
-        button.setBorderPainted(false);
-        button.setContentAreaFilled(false);
+        button.setBorderPainted(true);
+        button.setContentAreaFilled(true);
+        button.setForeground(text.equals("清空") ? new Color(150, 150, 150) : ideFontColor);
+        button.setBackground(subtleFill(14));
+        button.setBorder(BorderFactory.createCompoundBorder(
+                new LineBorder(subtleLine(62), 1, true),
+                BorderFactory.createEmptyBorder(2, 10, 2, 10)
+        ));
         
         // 添加悬停效果
         button.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseEntered(MouseEvent e) {
-                button.setForeground(new Color(52, 152, 219));
+                button.setForeground(new Color(72, 134, 237));
+                button.setBackground(accentFill(new Color(72, 134, 237), 20));
+                button.setBorder(BorderFactory.createCompoundBorder(
+                        new LineBorder(accentFill(new Color(72, 134, 237), 130), 1, true),
+                        BorderFactory.createEmptyBorder(2, 10, 2, 10)
+                ));
             }
 
             @Override
             public void mouseExited(MouseEvent e) {
                 if (text.equals("清空")) {
-                    button.setForeground(new Color(180, 180, 180));
+                    button.setForeground(new Color(135, 135, 135));
                 } else {
                     button.setForeground(ideFontColor);
                 }
+                button.setBackground(subtleFill(14));
+                button.setBorder(BorderFactory.createCompoundBorder(
+                        new LineBorder(subtleLine(62), 1, true),
+                        BorderFactory.createEmptyBorder(2, 10, 2, 10)
+                ));
             }
         });
 
@@ -711,29 +866,29 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         UIState state = getOrCreateState(project);
         
         JPanel contextPanel = new JPanel(new BorderLayout(0, 0));
-        contextPanel.setBackground(ideBackgroundColor);
-        contextPanel.setBorder(BorderFactory.createEmptyBorder(8, 12, 0, 12)); // 只设置左右和上边距
+        contextPanel.setBackground(subtleFill(0));
+        contextPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 7, 0));
 
         // 创建顶部操作栏（选择按钮 + 文件计数）
         JPanel topActionPanel = new JPanel(new BorderLayout());
-        topActionPanel.setBackground(ideBackgroundColor);
+        topActionPanel.setBackground(subtleFill(0));
         
         // 左侧：文件操作按钮
         JPanel actionButtonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
-        actionButtonPanel.setBackground(ideBackgroundColor);
+        actionButtonPanel.setBackground(subtleFill(0));
         
         JButton selectFileButton = createCompactFileButton("选择文件");
         JButton clearButton = createCompactFileButton("清空");
         clearButton.setForeground(new Color(180, 180, 180));
         
         actionButtonPanel.add(selectFileButton);
-        actionButtonPanel.add(Box.createHorizontalStrut(8));
+        actionButtonPanel.add(Box.createHorizontalStrut(6));
         actionButtonPanel.add(clearButton);
         
         // 右侧：文件计数显示
         JLabel fileCountLabel = new JLabel("未选择文件");
         fileCountLabel.setFont(new Font("SansSerif", Font.PLAIN, 11));
-        fileCountLabel.setForeground(new Color(128, 128, 128));
+        fileCountLabel.setForeground(new Color(145, 145, 145));
         
         topActionPanel.add(actionButtonPanel, BorderLayout.WEST);
         topActionPanel.add(fileCountLabel, BorderLayout.EAST);
@@ -797,7 +952,7 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         
         JBScrollPane fileListScrollPane = new JBScrollPane(state.selectedFilesList);
         fileListScrollPane.setBorder(null);
-        fileListScrollPane.setBackground(ideBackgroundColor);
+        fileListScrollPane.setBackground(subtleFill(0));
         fileListScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
         fileListScrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         fileListScrollPane.setVisible(false); // 初始隐藏
@@ -880,11 +1035,8 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         buttonPanel.setBackground(ideBackgroundColor);
         
-        JButton addButton = new JButton("添加选中");
-        addButton.setPreferredSize(new Dimension(80, 28));
-        
-        JButton cancelButton = new JButton("取消");
-        cancelButton.setPreferredSize(new Dimension(60, 28));
+        JButton addButton = createActionButton("添加选中", ButtonStyle.PRIMARY);
+        JButton cancelButton = createActionButton("取消", ButtonStyle.SECONDARY);
         
         buttonPanel.add(addButton);
         buttonPanel.add(cancelButton);
@@ -1159,7 +1311,7 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         if (state == null || state.questionTextArea == null) return;
 
         String question = state.questionTextArea.getText().trim();
-        if (question.isEmpty() || question.equals("输入问题，点击回车或提交发送")) {
+        if (question.isEmpty() || question.equals(QUESTION_PLACEHOLDER)) {
             String errorMessage = "<div style='color: #ff6b6b; padding: 10px; background-color: rgba(255, 107, 107, 0.1); border-radius: 4px;'>请输入问题内容</div>";
             updateResult(errorMessage, project);
             return;
@@ -1170,8 +1322,8 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
             state.askButton.setVisible(false);
             state.cancelButton.setVisible(true);
             // 清空输入框并恢复placeholder状态
-            state.questionTextArea.setText("输入问题，点击回车或提交发送");
-            state.questionTextArea.setForeground(new Color(180, 180, 180));
+            state.questionTextArea.setText(QUESTION_PLACEHOLDER);
+            applyQuestionTextAreaColors(state.questionTextArea, false);
         });
 
         // 不清空聊天历史，保持累积对话
@@ -1182,15 +1334,14 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
 
         String formattedQuestion = String.format(
-                "<div class='chat-item question-item' id='qa-%s' style='margin: 10px 0; padding: 10px; border-left: 3px solid #4CAF50; position: relative;'>" +
-                        "<div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;'>" +
-                        "<strong style='color: #4CAF50;'>Q:</strong>" +
-                        "<div style=\"display: flex; align-items: center; gap: 10px;\">" +
-                        "<span style='color: #666; font-size: 0.9em;'>%s</span>" +
-                        "<button onclick='handleDeleteQA(\\\"qa-%s\\\")' style='background: none; border: none; color: #999; cursor: pointer;'>×</button>" +
+                "<div class='chat-item message-row question-item' id='qa-%s'>" +
+                        "<div class='message-bubble'>" +
+                        "<div class='message-meta'>" +
+                        "<span class='message-role'><span class='role-dot'></span>你</span>" +
+                        "<span class='message-actions'><span>%s</span><button class='delete-btn' onclick='handleDeleteQA(\\\"qa-%s\\\")'>×</button></span>" +
                         "</div>" +
+                        "<div class='message-content'>%s</div>" +
                         "</div>" +
-                        "<div style='margin-left: 20px;'>%s</div>" +
                         "</div>",
                 qaId, timestamp, qaId, question
         );
@@ -1205,6 +1356,7 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
         
         // 构建包含上下文文件的提示词
         StringBuilder promptBuilder = new StringBuilder();
+        appendConversationContext(promptBuilder, state);
         
         // 添加上下文文件内容
         if (!state.selectedFilesPaths.isEmpty()) {
@@ -1249,12 +1401,14 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
                                     token -> {
                                         state.messageBuilder.append(token);
                                         String formattedAnswer = String.format(
-                                                "<div class='chat-item answer-item' id='answer-%s' style='margin: 10px 0; padding: 10px; border-left: 3px solid #2196F3;'>" +
-                                                        "<div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;'>" +
-                                                        "<strong style='color: #2196F3;'>A:</strong>" +
-                                                        "<span style='color: #666; font-size: 0.9em;'>%s</span>" +
+                                                "<div class='chat-item message-row answer-item' id='answer-%s'>" +
+                                                        "<div class='message-bubble'>" +
+                                                        "<div class='message-meta'>" +
+                                                        "<span class='message-role'><span class='role-dot'></span>AI</span>" +
+                                                        "<span>%s</span>" +
                                                         "</div>" +
-                                                        "<div style='margin-left: 20px;'>%s</div>" +
+                                                        "<div class='message-content'>%s</div>" +
+                                                        "</div>" +
                                                         "</div>",
                                                 qaId, timestamp, state.messageBuilder.toString()
                                         );
@@ -1266,20 +1420,24 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
                                     () -> {
                                         // 将完整的问答对添加到历史记录
                                         String finalAnswer = String.format(
-                                                "<div class='chat-item answer-item' id='answer-%s' style='margin: 10px 0; padding: 10px; border-left: 3px solid #2196F3;'>" +
-                                                        "<div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;'>" +
-                                                        "<strong style='color: #2196F3;'>A:</strong>" +
-                                                        "<span style='color: #666; font-size: 0.9em;'>%s</span>" +
+                                                "<div class='chat-item message-row answer-item' id='answer-%s'>" +
+                                                        "<div class='message-bubble'>" +
+                                                        "<div class='message-meta'>" +
+                                                        "<span class='message-role'><span class='role-dot'></span>AI</span>" +
+                                                        "<span>%s</span>" +
                                                         "</div>" +
-                                                        "<div style='margin-left: 20px;'>%s</div>" +
+                                                        "<div class='message-content'>%s</div>" +
+                                                        "</div>" +
                                                         "</div>",
                                                 qaId, timestamp, state.messageBuilder.toString()
                                         );
                                         // 只在答案后面添加一条分割线，为下一轮对话做准备
+                                        String answerText = state.messageBuilder.toString();
+                                        addConversationTurn(state, question, answerText);
                                         state.chatHistory.append(finalAnswer);
-                                        state.chatHistory.append("<hr style='border: none; border-top: 1px solid #ddd; margin: 20px 0;'>");
+                                        state.chatHistory.append("<hr class='chat-separator'>");
                                         
-                                        saveHistory(project, question, displayContent.get());
+                                        saveHistory(project, question, answerText);
                                         ApplicationManager.getApplication().invokeLater(() -> {
                                             resetButton(project);
                                             // 不需要再次设置placeholder，因为已经在点击时设置了
@@ -1330,6 +1488,27 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
     }
     // 在CombinedWindowFactory中添加:
 
+    private void appendConversationContext(StringBuilder promptBuilder, UIState state) {
+        if (state.conversationTurns.isEmpty()) {
+            return;
+        }
+
+        promptBuilder.append("以下是当前会话的历史对话，请结合上下文理解用户最新问题；如果历史与最新问题无关，可以忽略。\n\n");
+        int start = Math.max(0, state.conversationTurns.size() - MAX_CONVERSATION_CONTEXT_TURNS);
+        for (int i = start; i < state.conversationTurns.size(); i++) {
+            ConversationTurn turn = state.conversationTurns.get(i);
+            promptBuilder.append("用户：").append(turn.question).append("\n");
+            promptBuilder.append("助手：").append(turn.answer).append("\n\n");
+        }
+        promptBuilder.append("---\n\n");
+    }
+
+    private void addConversationTurn(UIState state, String question, String answer) {
+        state.conversationTurns.add(new ConversationTurn(question, answer));
+        if (state.conversationTurns.size() > MAX_CONVERSATION_CONTEXT_TURNS) {
+            state.conversationTurns.remove(0);
+        }
+    }
 
     private void saveHistory(Project project, String question, String answer) {
         ChatHistoryService service = ChatHistoryService.getInstance();
@@ -1516,12 +1695,7 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
                         state.outputPanel.repaint();
                         state.loadingPanel = null;
                     } else {
-                        state.outputPanel.setBackground(new Color(
-                            ideBackgroundColor.getRed(),
-                            ideBackgroundColor.getGreen(),
-                            ideBackgroundColor.getBlue(),
-                            (int)(opacity * 255)
-                        ));
+                        state.outputPanel.setBackground(ideBackgroundColor);
                         state.outputPanel.repaint();
                     }
                 }
@@ -1708,20 +1882,19 @@ public class CombinedWindowFactory implements ToolWindowFactory, EditorColorsLis
                 setToolTipText(value);
             }
             
-            // 设置背景和前景颜色
-            Color backgroundColor = isSelected ? new Color(230, 240, 250) : ideBackgroundColor;
-            Color foregroundColor = isSelected ? new Color(60, 120, 180) : new Color(100, 100, 100);
+            Color backgroundColor = isSelected ? list.getSelectionBackground() : list.getBackground();
+            Color foregroundColor = isSelected ? list.getSelectionForeground() : list.getForeground();
             
             setBackground(backgroundColor);
             fileLabel.setForeground(foregroundColor);
             fileLabel.setBackground(backgroundColor);
             
-            // 删除按钮的样式调整
+            // 跟随列表选中态颜色，避免在浅色/深色主题下出现黑块或不可读文本。
             if (isSelected) {
-                deleteLabel.setBackground(new Color(220, 230, 240));
-                deleteLabel.setForeground(new Color(150, 150, 150));
+                deleteLabel.setBackground(backgroundColor);
+                deleteLabel.setForeground(foregroundColor);
             } else {
-                deleteLabel.setBackground(new Color(248, 248, 248));
+                deleteLabel.setBackground(backgroundColor);
                 deleteLabel.setForeground(new Color(180, 180, 180));
             }
             

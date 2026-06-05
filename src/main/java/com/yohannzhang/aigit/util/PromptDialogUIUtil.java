@@ -2,9 +2,12 @@ package com.yohannzhang.aigit.util;
 
 import com.intellij.ui.JBColor;
 import com.intellij.ui.components.JBScrollPane;
+import com.intellij.ui.components.JBTextArea;
+import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.JBUI;
 
 import javax.swing.*;
+import javax.swing.text.JTextComponent;
 import java.awt.*;
 
 /**
@@ -51,10 +54,12 @@ public class PromptDialogUIUtil {
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.anchor = GridBagConstraints.WEST;
 
-        JTextField descriptionField = new JTextField(isAdd ? "" : description, 30);
-        JTextArea contentArea = new JTextArea(isAdd ? "" : content, 15, 70); // 增加行数和列数
+        JTextField descriptionField = new JBTextField(isAdd ? "" : description, 30);
+        JTextArea contentArea = new JBTextArea(isAdd ? "" : content, 15, 70); // 增加行数和列数
         contentArea.setLineWrap(true);
         contentArea.setWrapStyleWord(true);
+        applyInputColors(descriptionField);
+        applyInputColors(contentArea);
 
         // 添加描述标签和输入框
         gbc.gridx = 0;
@@ -82,6 +87,10 @@ public class PromptDialogUIUtil {
         gbc.fill = GridBagConstraints.BOTH;
         JBScrollPane scrollPane = new JBScrollPane(contentArea);
         scrollPane.setPreferredSize(new Dimension(800, 600)); // 增加滚动面板的首选大小
+        scrollPane.setBackground(getInputBackground());
+        scrollPane.getViewport().setBackground(getInputBackground());
+        scrollPane.setOpaque(true);
+        scrollPane.getViewport().setOpaque(true);
         panel.add(scrollPane, gbc);
 
         // 添加 Inline help text
@@ -100,5 +109,38 @@ public class PromptDialogUIUtil {
         promptDialogUI.setDescriptionField(descriptionField);
         promptDialogUI.setContentArea(contentArea);
         return promptDialogUI;
+    }
+
+    private static void applyInputColors(JTextComponent textComponent) {
+        textComponent.setBackground(getInputBackground());
+        textComponent.setForeground(getInputForeground());
+        textComponent.setCaretColor(getInputForeground());
+        textComponent.setSelectionColor(getSelectionBackground());
+        textComponent.setSelectedTextColor(getSelectionForeground());
+        textComponent.setOpaque(true);
+    }
+
+    private static Color getInputBackground() {
+        return UIManager.getColor("TextField.background") != null
+                ? UIManager.getColor("TextField.background")
+                : JBColor.PanelBackground;
+    }
+
+    private static Color getInputForeground() {
+        return UIManager.getColor("TextField.foreground") != null
+                ? UIManager.getColor("TextField.foreground")
+                : JBColor.foreground();
+    }
+
+    private static Color getSelectionBackground() {
+        return UIManager.getColor("TextField.selectionBackground") != null
+                ? UIManager.getColor("TextField.selectionBackground")
+                : new JBColor(new Color(184, 207, 229), new Color(55, 92, 135));
+    }
+
+    private static Color getSelectionForeground() {
+        return UIManager.getColor("TextField.selectionForeground") != null
+                ? UIManager.getColor("TextField.selectionForeground")
+                : new JBColor(Color.BLACK, Color.WHITE);
     }
 }

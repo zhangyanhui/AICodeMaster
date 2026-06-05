@@ -51,6 +51,10 @@ public class ApiKeyConfigurableUI {
         moduleComboBox.setEditable(true);
         languageComboBox = new ComboBox<>(Constants.languages);
         promptTypeComboBox = new ComboBox<>(Constants.getAllPromptTypes());
+        applyComboBoxColors(clientComboBox);
+        applyComboBoxColors(moduleComboBox);
+        applyComboBoxColors(languageComboBox);
+        applyComboBoxColors(promptTypeComboBox);
         customPromptsTableModel = new DefaultTableModel(new String[]{"Description", "Prompt"}, 0);
         customPromptsTable = new JBTable(customPromptsTableModel);
 
@@ -92,9 +96,6 @@ public class ApiKeyConfigurableUI {
 
     public void updateModuleSetting(String selectedClient) {
         updateModuleComboBox(selectedClient);
-        initComponents();
-        layoutComponents();
-        setupListeners();
 //        updateStreamStatus(streamLabel, selectedClient);
     }
 
@@ -289,20 +290,43 @@ public class ApiKeyConfigurableUI {
     }
 
     private void setupListeners() {
-        clientComboBox.addActionListener(e -> {
-            String selectedClient = (String) clientComboBox.getSelectedItem();
-            updateModuleComboBox(selectedClient);
-        });
-
         configButton.addActionListener(e -> showModuleConfigDialog());
     }
 
     public void updateModuleComboBox(String selectedClient) {
         moduleComboBox.removeAllItems();
-        String[] modules = Constants.CLIENT_MODULES.get(selectedClient);
-        if (modules != null) {
-            for (String module : modules) {
-                moduleComboBox.addItem(module);
+        String[] modules = ApiKeySettings.getInstance().getModulesForClient(selectedClient);
+        for (String module : modules) {
+            moduleComboBox.addItem(module);
+        }
+        applyComboBoxColors(moduleComboBox);
+    }
+
+    private void applyComboBoxColors(JComboBox<String> comboBox) {
+        Color background = UIManager.getColor("ComboBox.background") != null
+                ? UIManager.getColor("ComboBox.background")
+                : UIManager.getColor("TextField.background");
+        Color foreground = UIManager.getColor("ComboBox.foreground") != null
+                ? UIManager.getColor("ComboBox.foreground")
+                : UIManager.getColor("TextField.foreground");
+        if (background == null) {
+            background = JBColor.PanelBackground;
+        }
+        if (foreground == null) {
+            foreground = JBColor.foreground();
+        }
+
+        comboBox.setBackground(background);
+        comboBox.setForeground(foreground);
+        comboBox.setOpaque(true);
+
+        Component editorComponent = comboBox.getEditor().getEditorComponent();
+        if (editorComponent != null) {
+            editorComponent.setBackground(background);
+            editorComponent.setForeground(foreground);
+            if (editorComponent instanceof JTextField textField) {
+                textField.setCaretColor(foreground);
+                textField.setOpaque(true);
             }
         }
     }

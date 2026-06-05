@@ -11,15 +11,18 @@
         #content { color: var(--idefont-color); font-size: 14px; line-height: 1.6; }
         pre { background-color: #f6f8fa; border-radius: 6px; padding: 16px; }
         code { font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace; }
-        .welcome-container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
-        .welcome-header { text-align: center; margin-bottom: 40px; }
-        .welcome-title { font-size: 32px; margin-bottom: 12px; font-weight: 600; }
-        .welcome-subtitle { font-size: 18px; opacity: 0.8; }
-        .welcome-content { text-align: center; margin-top: 40px; }
-        .welcome-text { font-size: 16px; line-height: 2.0; margin-bottom: 20px; }
-        .feature-item { display: flex; align-items: center; justify-content: center; margin: 12px 0; }
-        .feature-icon { margin-right: 12px; font-size: 20px; }
+        .welcome-container { max-width: 720px; margin: 0 auto; padding: 42px 18px; }
+        .welcome-header { text-align: left; margin-bottom: 26px; }
+        .welcome-kicker { font-size: 12px; letter-spacing: 0; text-transform: uppercase; color: rgba(127,127,127,0.88); margin-bottom: 10px; }
+        .welcome-title { font-size: 24px; margin-bottom: 8px; font-weight: 650; }
+        .welcome-subtitle { max-width: 560px; font-size: 14px; line-height: 1.7; opacity: 0.74; }
+        .welcome-content { margin-top: 24px; border-top: 1px solid rgba(127,127,127,0.18); }
+        .welcome-text { font-size: 14px; line-height: 1.65; margin-bottom: 20px; }
+        .feature-item { display: grid; grid-template-columns: 42px 1fr; gap: 12px; padding: 13px 0; border-bottom: 1px solid rgba(127,127,127,0.13); }
+        .feature-icon { font-family: 'JetBrains Mono', 'Courier New', monospace; font-size: 12px; color: rgba(127,127,127,0.88); padding-top: 1px; }
         .feature-text { text-align: left; }
+        .feature-title { display: block; font-weight: 650; margin-bottom: 3px; }
+        .feature-desc { display: block; opacity: 0.68; }
         .delete-btn:hover { color: #ff6b6b !important; background-color: rgba(255, 107, 107, 0.1); }
         .chat-item { position: relative; }
         .chat-item:hover .delete-btn { opacity: 1; }
@@ -30,21 +33,40 @@
 <div id='content'>
     <div class='welcome-container'>
         <div class='welcome-header'>
-            <div class='welcome-title'>AI 编程助手</div>
-            <div class='welcome-subtitle'>智能编程，高效开发</div>
+            <div class='welcome-kicker'>DevPilot</div>
+            <div class='welcome-title'>代码上下文工作台</div>
+            <div class='welcome-subtitle'>选择代码、引用文件或直接提问。回答会保留在当前会话中，最近 6 轮对话会作为上下文继续参与分析。</div>
         </div>
         <div class='welcome-content'>
             <div class='welcome-text'>
-                <div class='feature-item'><span class='feature-icon'>✨</span><span
-                        class='feature-text'>代码分析优化</span></div>
-                <div class='feature-item'><span class='feature-icon'>🔍</span><span
-                        class='feature-text'>问题诊断修复</span></div>
-                <div class='feature-item'><span class='feature-icon'>🚀</span><span
-                        class='feature-text'>代码重构优化</span></div>
-                <div class='feature-item'><span class='feature-icon'>💡</span><span
-                        class='feature-text'>最佳实践指导</span></div>
-                <div class='feature-item'><span class='feature-icon'>🤖</span><span
-                        class='feature-text'>智能代码补全</span></div>
+                <div class='feature-item'>
+                    <span class='feature-icon'>01</span>
+                    <span class='feature-text'>
+                        <span class='feature-title'>定位问题</span>
+                        <span class='feature-desc'>结合选中代码、上下文文件和报错信息，整理原因与修改建议。</span>
+                    </span>
+                </div>
+                <div class='feature-item'>
+                    <span class='feature-icon'>02</span>
+                    <span class='feature-text'>
+                        <span class='feature-title'>解释代码</span>
+                        <span class='feature-desc'>按调用关系、数据流和边界条件说明当前实现。</span>
+                    </span>
+                </div>
+                <div class='feature-item'>
+                    <span class='feature-icon'>03</span>
+                    <span class='feature-text'>
+                        <span class='feature-title'>生成改动</span>
+                        <span class='feature-desc'>输出可落地的实现片段、测试建议和必要的注意事项。</span>
+                    </span>
+                </div>
+                <div class='feature-item'>
+                    <span class='feature-icon'>04</span>
+                    <span class='feature-text'>
+                        <span class='feature-title'>整理提交</span>
+                        <span class='feature-desc'>基于 diff 生成规范的提交信息，减少提交前的重复整理。</span>
+                    </span>
+                </div>
             </div>
         </div>
     </div>
@@ -82,4 +104,4 @@
     }
 </script>
 </body>
-</html> 
+</html>

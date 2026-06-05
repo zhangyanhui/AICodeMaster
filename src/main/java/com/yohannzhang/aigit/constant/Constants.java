@@ -34,8 +34,9 @@ public class Constants {
     public static final String 阿里云百炼 = "阿里云百炼(Model Hub)";
     public static final String SiliconFlow = "SiliconFlow(Model Hub)";
     public static final String CloudflareWorkersAI = "Cloudflare Workers AI";
+    public static final String VLLM = "vLLM";
 
-    public static final String[] LLM_CLIENTS = {Gemini, DeepSeek, OpenAI_API, Ollama, CloudflareWorkersAI, 阿里云百炼, SiliconFlow};
+    public static final String[] LLM_CLIENTS = {Gemini, DeepSeek, OpenAI_API, Ollama, CloudflareWorkersAI, 阿里云百炼, SiliconFlow, VLLM};
 
     public static final Map<String, String[]> CLIENT_MODULES = new HashMap<>() {
         {
@@ -47,6 +48,7 @@ public class Constants {
                     new String[]{"@cf/meta/llama-3.1-70b-instruct", "@cf/meta/llama-3.1-8b-instruct"});
             put(阿里云百炼, new String[]{"qwen-plus"});
             put(SiliconFlow, new String[]{"deepseek-ai/DeepSeek-V2.5", "Qwen/Qwen2.5-Coder-32B-Instruct"});
+            put(VLLM, new String[]{"qwen-27b-agent"});
         }
     };
 
@@ -58,6 +60,7 @@ public class Constants {
             put(OpenAI_API, new ApiKeySettings.ModuleConfig("https://{host}/v1/chat/completions", ""));
             put(阿里云百炼, new ApiKeySettings.ModuleConfig("https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", ""));
             put(SiliconFlow, new ApiKeySettings.ModuleConfig("https://api.siliconflow.cn/v1/chat/completions", ""));
+            put(VLLM, new ApiKeySettings.ModuleConfig("http://10.162.5.19:3000/v1/messages", ""));
             put(CloudflareWorkersAI, new ApiKeySettings.ModuleConfig(
                     "https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/v1/chat/completions", ""));
         }
@@ -71,6 +74,7 @@ public class Constants {
             put(Constants.阿里云百炼, "https://help.aliyun.com/zh/model-studio/developer-reference/get-api-key?spm=0.0.0.i7");
             put(Constants.SiliconFlow, "https://cloud.siliconflow.cn/i/lszKPlCW");
             put(Constants.OpenAI_API, "https://platform.openai.com/docs/overview");
+            put(Constants.VLLM, "https://docs.vllm.ai/");
         }
     };
 
@@ -99,6 +103,10 @@ public class Constants {
                     "<html>Get your API key from <a href='https://help.aliyun.com/zh/model-studio/developer-reference/get-api-key?spm=0.0.0.i7'>" + 阿里云百炼 + "</a></html>";
             case SiliconFlow ->
                     "<html>Get your API key from <a href='https://cloud.siliconflow.cn/i/lszKPlCW'>" + SiliconFlow + "</a></html>";
+            case VLLM -> "<html>" +
+                    "<li>Configure the vLLM compatible endpoint, for example http://host:port/v1/messages.</li>" +
+                    "<li>API Key can be any bearer token if your vLLM gateway requires one.</li>" +
+                    "</html>";
             default -> "";
         };
     }

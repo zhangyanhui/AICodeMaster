@@ -17,6 +17,7 @@ public class LLMEngineFactory {
             case Constants.CloudflareWorkersAI -> new CloudflareWorkersAIEngine(moduleConfig.getApiKey(), moduleConfig.getUrl());
             case Constants.阿里云百炼 -> new AliyunTongyiEngine(moduleConfig.getApiKey(), moduleConfig.getUrl());
             case Constants.SiliconFlow -> new SiliconFlowEngine(moduleConfig.getApiKey(), moduleConfig.getUrl());
+            case Constants.VLLM -> new VllmEngine(moduleConfig.getApiKey(), moduleConfig.getUrl());
             default -> throw new IllegalStateException("Unsupported LLM client: " + selectedClient);
         };
     }

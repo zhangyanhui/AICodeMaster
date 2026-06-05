@@ -247,6 +247,7 @@ public class GenerateCommitMessageAction extends AnAction {
                                         streamCompleted.set(true);
                                         ApplicationManager.getApplication().invokeLater(() -> {
                                             if (!indicator.isCanceled()) {
+                                                commitMessage.setCommitMessage(buildFinalMessage(finalBranchName, messageBuilder.toString()));
                                                 // 确保在流式生成完成时恢复按钮状态
                                                 restoreButtonState(e, false);
                                                 // 强制更新UI
@@ -274,6 +275,7 @@ public class GenerateCommitMessageAction extends AnAction {
                             // 确保在完成后再次检查状态
                             if (streamCompleted.get() && !indicator.isCanceled()) {
                                 ApplicationManager.getApplication().invokeLater(() -> {
+                                    commitMessage.setCommitMessage(buildFinalMessage(finalBranchName, messageBuilder.toString()));
                                     restoreButtonState(e, false);
                                     // 强制更新UI
                                     SwingUtilities.invokeLater(() -> {
@@ -341,7 +343,85 @@ public class GenerateCommitMessageAction extends AnAction {
     }
 
     private String buildFinalMessage(String branchName, String content) {
-        return branchName + ":" + content;
+        return branchName + ":" + extractCommitMessage(content);
+    }
+
+    private String extractCommitMessage(String content) {
+        if (content == null) {
+            return "";
+        }
+
+        String normalized = content.replace("\r\n", "\n").replace('\r', '\n').trim();
+        int markerIndex = findLastMarkerIndex(normalized);
+        if (markerIndex >= 0) {
+            int lineEnd = normalized.indexOf('\n', markerIndex);
+            normalized = lineEnd >= 0 ? normalized.substring(lineEnd + 1).trim() : "";
+        }
+
+        normalized = stripCodeFence(normalized);
+        normalized = normalizeAiFooter(normalized);
+        return normalized.trim();
+    }
+
+    private int findLastMarkerIndex(String content) {
+        String lowerContent = content.toLowerCase();
+        String[] markers = {
+                "最终提交信息",
+                "最终 commit message",
+                "最终commit message",
+                "final commit message",
+                "commit message"
+        };
+
+        int lastIndex = -1;
+        for (String marker : markers) {
+            int index = lowerContent.lastIndexOf(marker);
+            if (index > lastIndex) {
+                lastIndex = index;
+            }
+        }
+        return lastIndex;
+    }
+
+    private String stripCodeFence(String content) {
+        String result = content.trim();
+        if (!result.startsWith("```")) {
+            return result;
+        }
+
+        int firstLineEnd = result.indexOf('\n');
+        if (firstLineEnd < 0) {
+            return "";
+        }
+
+        result = result.substring(firstLineEnd + 1);
+        int lastFenceIndex = result.lastIndexOf("```");
+        if (lastFenceIndex >= 0) {
+            result = result.substring(0, lastFenceIndex);
+        }
+        return result.trim();
+    }
+
+    private String normalizeAiFooter(String content) {
+        String[] footerMarkers = {
+                "【AI 辅助】",
+                "【AI辅助】",
+                "AI 辅助",
+                "AI辅助"
+        };
+
+        int footerIndex = -1;
+        for (String marker : footerMarkers) {
+            int index = content.indexOf(marker);
+            if (index >= 0 && (footerIndex < 0 || index < footerIndex)) {
+                footerIndex = index;
+            }
+        }
+        if (footerIndex < 0) {
+            return content;
+        }
+
+        return content.substring(0, footerIndex).trim() + "\n\n【AI辅助】*";
     }
 
     @Override
